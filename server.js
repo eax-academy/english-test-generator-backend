@@ -1,10 +1,11 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import { connectDB } from './config/db.js';
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { connectDB } from "./config/db.js";
 
-import authRoutes from './routes/auth.routes.js';
-import quizRoutes from './routes/quiz.routes.js';
+import authRoutes from "./routes/auth.routes.js";
+import quizRoutes from "./routes/quiz.routes.js";
+import wordRoutes from "./routes/analyze.routes.js";
 
 dotenv.config();
 const app = express();
@@ -17,15 +18,18 @@ app.use(express.json());
 connectDB();
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/quiz', quizRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/quiz", quizRoutes);
+app.use("/api/words", wordRoutes);
 
-app.get('/', (req, res) => res.json({ message: '🧠 English Test Generator Backend is running' }));
+app.get("/", (req, res) =>
+  res.json({ message: "🧠 English Test Generator Backend is running" })
+);
 
 // Error Handling
 app.use((err, req, res, next) => {
-  console.error('❌', err.message);
-  res.status(500).json({ message: 'Internal Server Error' });
+  console.error("❌", err.message);
+  res.status(500).json({ message: "Internal Server Error" });
 });
 
 const PORT = process.env.PORT || 5000;
