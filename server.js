@@ -5,6 +5,10 @@ import { connectDB } from './config/db.js';
 
 import authRoutes from './routes/auth.routes.js';
 import quizRoutes from './routes/quiz.routes.js';
+import adminRouter from './routes/admin.routes.js';
+import testsRouter from './routes/tests.routes.js';
+import usersRouter from './routes/users.routes.js';
+import loggerMiddleware from './middleware/logger.middleware.js';
 
 dotenv.config();
 const app = express();
@@ -17,8 +21,12 @@ app.use(express.json());
 connectDB();
 
 // Routes
-app.use('/api/auth', authRoutes);
+app.use(loggerMiddleware);
+app.use('/api/v1', authRoutes); // /api/v1/register, /api/v1/login
 app.use('/api/quiz', quizRoutes);
+app.use('/api/v1', adminRouter);
+app.use('/api/v1/tests', testsRouter);
+app.use('/api/v1/users', usersRouter);
 
 app.get('/', (req, res) => res.json({ message: '🧠 English Test Generator Backend is running' }));
 
