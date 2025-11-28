@@ -14,6 +14,9 @@ router.get('/', verifyToken, isAdmin, async (req, res) => {
     }
 });
 
+
+
+
 // POST /api/v1/words - Add new word
 router.post('/', verifyToken, isAdmin, async (req, res) => {
     try {

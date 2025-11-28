@@ -18,6 +18,8 @@ router.get('/me', verifyToken, async (req, res) => {
     }
 });
 
+
+
 // PUT /api/v1/users/me - Update own profile
 router.put('/me', verifyToken, async (req, res) => {
     try {

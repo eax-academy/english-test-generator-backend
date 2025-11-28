@@ -24,6 +24,8 @@ router.post('/generate/:submission_id', verifyToken, async (req, res) => {
             correct_answer: 'Option A'
         });
 
+
+        
         await newTest.save();
         res.status(201).json(newTest);
     } catch (err) {

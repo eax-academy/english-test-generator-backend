@@ -7,6 +7,8 @@ import { verifyToken, isAdmin } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
+
+
 router.use('/logs', adminLog);
 router.use('/words', adminWords);
 

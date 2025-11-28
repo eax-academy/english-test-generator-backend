@@ -14,6 +14,8 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
+
+
 // --- Helpers ---
 const generateToken = () => {
     const payload = {

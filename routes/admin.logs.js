@@ -4,6 +4,8 @@ import { verifyToken, isAdmin } from '../middleware/auth.middleware.js';
 
 const adminLog = express.Router();
 
+
+
 // GET /api/v1/logs - View system activity records (Admins only)
 adminLog.get('/', verifyToken, isAdmin, async (req, res) => {
     try {
