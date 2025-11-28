@@ -2,7 +2,7 @@ import Quiz from '../models/quiz.model.js';
 import fetch from "node-fetch";
 
 // ---------------- Keyword Extraction ----------------
-function extractKeywords(text, difficulty = "beginner") {
+function extractKeywords(text, difficulty = "basic") {
   const words = text
     .replace(/[^\w\s]/g, "")
     .toLowerCase()
@@ -151,14 +151,14 @@ async function generateQuiz(keywords, type = "mixed") {
 
 export async function createQuiz(req, res) {
   try {
-    const { title, text, difficulty = "beginner", type = "mixed" } = req.body;
+    const { title, text, difficulty = "basic", type = "mixed" } = req.body;
 
     if (!text || !title) {
       return res.status(400).json({ message: "Title and text required" });
     }
 
-    const safeDifficulty = ["beginner", "intermediate", "advanced"]
-      .includes(difficulty) ? difficulty : "beginner";
+    const safeDifficulty = ["basic", "intermediate", "advanced"]
+      .includes(difficulty) ? difficulty : "basic";
 
     const keywords = extractKeywords(text, safeDifficulty);
     const questions = await generateQuiz(keywords, type);
