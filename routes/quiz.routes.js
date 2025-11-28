@@ -14,3 +14,5 @@ router.get('/:id', getQuizById);
 router.delete('/:id', deleteQuiz);
 
 export default router;
+
+
