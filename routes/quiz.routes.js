@@ -1,6 +1,6 @@
 import express from 'express';
+import { createQuiz } from '../controllers/quiz.controller.js';
 import {
-  createQuiz,
   getAllQuizzes,
   getQuizById,
   deleteQuiz
