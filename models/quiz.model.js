@@ -11,7 +11,7 @@ const quizSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     text: { type: String, required: true },
-    difficulty: { type: String, enum: ['beginner', 'intermediate', 'advanced'], default: 'basic' },
+    difficulty: { type: String, enum: ['beginner', 'intermediate', 'advanced'], default: 'beginner' },
     questions: [questionSchema],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now }
