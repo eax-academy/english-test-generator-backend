@@ -28,7 +28,7 @@ app.use("/api/quiz", quizRoutes);
 app.use("/api/v1", adminRouter);
 app.use("/api/v1/tests", testsRouter);
 app.use("/api/v1/users", usersRouter);
-app.use("/api/v1/analyze", analyzeRouter);
+app.use("/api/v1/", analyzeRouter);
 
 app.get("/", (req, res) =>
   res.json({ message: "🧠 English Test Generator Backend is running" })
