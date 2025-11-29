@@ -88,27 +88,27 @@ export async function syncWordsWithDB(wordsList) {
 
   const dbResults = [];
 
-  for (const word of wordsList) {
+  // OPTIMIZATION: Use Promise.all instead of await inside a loop
+  // This runs all DB checks in parallel -> Much faster
+  const promises = wordsList.map(async (word) => {
     try {
-      if (!word) continue;
-
-      let wordData = await WordModel.findOne({ word: word });
-
+      let wordData = await WordModel.findOne({ word });
       if (!wordData) {
-        console.log(`💾 Saving new word to Global Dictionary: "${word}"`);
         wordData = await WordModel.create({
-          word: word,
-          level: "B1", // connect to real API
+          word,
+          level: "Unknown",
           definition: `Definition of ${word}`,
         });
       }
-      dbResults.push(wordData);
+      return wordData;
     } catch (err) {
-      console.error(`❌ DB Error on "${word}":`, err.message);
+      console.error(`DB Error on ${word}:`, err.message);
+      return null;
     }
-  }
+  });
 
-  return dbResults;
+  const results = await Promise.all(promises);
+  return results.filter((item) => item !== null); // Remove failed entries
 }
 
 /**
@@ -141,5 +141,5 @@ export async function processTextAnalysis(text) {
     };
   });
 
-  return finalResult;
+  // return finalResult;
 }
