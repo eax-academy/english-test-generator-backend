@@ -4,10 +4,10 @@ const WordSchema = new mongoose.Schema(
   {
     word: {
       type: String,
-      required: true,     // The word must exist
-      unique: true,       // No duplicate words allowed
-      index: true,        // Makes searching for words very fast
-      trim: true,         // Removes spaces from start/end automatically
+      required: true,
+      unique: true,
+      index: true,
+      trim: true,
     },
     definition: {
       type: String,
@@ -20,7 +20,6 @@ const WordSchema = new mongoose.Schema(
     partOfSpeech: {
       type: String,
       required: false,
-      // Examples: "noun", "verb", "adjective"
     },
     level: {
       type: String,
@@ -29,15 +28,12 @@ const WordSchema = new mongoose.Schema(
     },
     usage_count: {
       type: Number,
-      default: 0,         // Starts at 0 if not provided
+      default: 0,
     },
   },
   {
-    timestamps: true,     // Automatically adds 'createdAt' and 'updatedAt'
+    timestamps: true,
   }
 );
 
-// Check if the model is already defined (prevents errors in some environments)
-// Otherwise, define it.
-export const WordModel = mongoose.models.Word || mongoose.model("Word", WordSchema);
-
+export default mongoose.model("Word", WordSchema);
