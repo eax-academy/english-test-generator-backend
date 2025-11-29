@@ -40,3 +40,4 @@ const WordSchema = new mongoose.Schema(
 // Check if the model is already defined (prevents errors in some environments)
 // Otherwise, define it.
 export const WordModel = mongoose.models.Word || mongoose.model("Word", WordSchema);
+
