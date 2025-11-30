@@ -1,5 +1,4 @@
-import { processTextAnalysis } from "../services/analyze.service.js";
-
+import { handleTextSubmission } from "../services/analyze.service.js";
 /**
  * Controller to handle the text analysis request.
  * Receives HTTP request -> Calls Service -> Sends HTTP response.
@@ -7,6 +6,9 @@ import { processTextAnalysis } from "../services/analyze.service.js";
 export const analyzeTextController = async (req, res) => {
   try {
     const { text } = req.body;
+
+    // test ID, req.user (JWT middleware)
+    const userId = req.user?._id || "654321654321654321654321";
 
     if (!text || typeof text !== "string" || !text.trim()) {
       return res.status(400).json({
@@ -16,11 +18,12 @@ export const analyzeTextController = async (req, res) => {
     }
 
     console.log("Controller: Processing analysis...");
-    const analyzedData = await processTextAnalysis(text);
+    const result = await handleTextSubmission(text, userId);
 
-    return res.status(200).json({
+    return res.status(201).json({
       success: true,
-      data: analyzedData,
+      message: "Text processed and saved successfully.",
+      data: result,
     });
   } catch (error) {
     console.error("❌ Controller Error:", error);
