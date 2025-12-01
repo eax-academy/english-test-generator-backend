@@ -1,10 +1,15 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import { connectDB } from './config/db.js';
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { connectDB } from "./config/db.js";
 
-import authRoutes from './routes/auth.routes.js';
-import quizRoutes from './routes/quiz.routes.js';
+import authRoutes from "./routes/auth.routes.js";
+import quizRoutes from "./routes/quiz.routes.js";
+import adminRouter from "./routes/admin.routes.js";
+import testsRouter from "./routes/tests.routes.js";
+import usersRouter from "./routes/users.routes.js";
+import analyzeRouter from "./routes/analyze.routes.js";
+import loggerMiddleware from "./middleware/logger.middleware.js";
 
 dotenv.config();
 const app = express();
@@ -17,15 +22,22 @@ app.use(express.json());
 connectDB();
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/quiz', quizRoutes);
+app.use(loggerMiddleware);
+app.use("/api/v1", authRoutes); // /api/v1/register, /api/v1/login
+app.use("/api/quiz", quizRoutes);
+app.use("/api/v1", adminRouter);
+app.use("/api/v1/tests", testsRouter);
+app.use("/api/v1/users", usersRouter);
+app.use("/api/v1/", analyzeRouter);
 
-app.get('/', (req, res) => res.json({ message: '🧠 English Test Generator Backend is running' }));
+app.get("/", (req, res) =>
+  res.json({ message: "🧠 English Test Generator Backend is running" })
+);
 
 // Error Handling
 app.use((err, req, res, next) => {
-  console.error('❌', err.message);
-  res.status(500).json({ message: 'Internal Server Error' });
+  console.error("❌", err.message);
+  res.status(500).json({ message: "Internal Server Error" });
 });
 
 const PORT = process.env.PORT || 5000;
