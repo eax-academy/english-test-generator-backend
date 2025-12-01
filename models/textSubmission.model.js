@@ -5,7 +5,7 @@ const textSubmissionSchema = new mongoose.Schema(
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: false,
+      required: true,
     },
     raw_text: { type: String, required: true },
     normalized_words: [{ type: String }],
