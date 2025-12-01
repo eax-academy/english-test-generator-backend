@@ -1,8 +1,8 @@
 import Quiz from "../models/quiz.model.js";
-import fetch from "node-fetch";
+import { handleTextSubmission } from "./analyze.service.js";
 
-// ---------------- External APIs ----------------
-async function translateToArmenian(word) {
+// -------------------- External APIs --------------------
+export async function translateToArmenian(word) {
   try {
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
       word
@@ -15,7 +15,7 @@ async function translateToArmenian(word) {
   }
 }
 
-async function fetchDefinitionAndPos(word) {
+export async function fetchDefinitionAndPos(word) {
   try {
     const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(
       word
@@ -34,13 +34,15 @@ async function fetchDefinitionAndPos(word) {
   }
 }
 
-// ---------------- Utilities ----------------
+// -------------------- Utility Functions --------------------
 function capitalize(s) {
   return s ? s[0].toUpperCase() + s.slice(1) : "";
 }
+
 function escapeRegExp(s = "") {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
 function shuffleArray(arr = []) {
   return arr
     .map((x) => ({ x, r: Math.random() }))
@@ -48,7 +50,7 @@ function shuffleArray(arr = []) {
     .map((o) => o.x);
 }
 
-function guessPos(word, definition = "") {
+function guessPos(word) {
   const w = word.toLowerCase();
   if (w.endsWith("ly")) return "adverb";
   if (/(ing|ize|ise|ate|fy|en)$/.test(w)) return "verb";
@@ -57,7 +59,7 @@ function guessPos(word, definition = "") {
   return "noun";
 }
 
-// ---------------- Word Cache ----------------
+// -------------------- Build Word Metadata Cache --------------------
 async function buildWordCache(keywords = []) {
   const cache = new Map();
   await Promise.all(
@@ -66,14 +68,14 @@ async function buildWordCache(keywords = []) {
         translateToArmenian(k),
         fetchDefinitionAndPos(k),
       ]);
-      const pos = defPos.pos || guessPos(k, defPos.definition);
+      const pos = defPos.pos || guessPos(k);
       cache.set(k, { translation, definition: defPos.definition, pos });
     })
   );
   return cache;
 }
 
-// ---------------- Templates ----------------
+// -------------------- Question Templates --------------------
 const TEMPLATES = {
   verb: [
     (w) => `I ${w} every day.`,
@@ -99,17 +101,14 @@ const TEMPLATES = {
   ],
 };
 
-// ---------------- Question Generators ----------------
+// -------------------- Question Generators --------------------
 function makeFillQuestion(word, meta, pool) {
   const pos = meta.pos || "noun";
   const templates = TEMPLATES[pos] || TEMPLATES.noun;
-  let sentence = templates[Math.floor(Math.random() * templates.length)](word);
-  const questionText = sentence.replace(
-    new RegExp(`\\b${escapeRegExp(word)}\\b`, "i"),
-    "____"
-  );
-
+  const sentence = templates[Math.floor(Math.random() * templates.length)](word);
+  const questionText = sentence.replace(new RegExp(`\\b${escapeRegExp(word)}\\b`, "i"), "____");
   const distractors = shuffleArray(pool.filter((k) => k !== word)).slice(0, 3);
+
   return {
     type: "fill",
     question: questionText,
@@ -152,7 +151,7 @@ function makeTranslationQuestion(word, meta, keywords, cache) {
   };
 }
 
-// ---------------- Main Quiz Generator ----------------
+// -------------------- Main Quiz Generator --------------------
 export async function generateQuiz(keywords, type = "mixed", total = 10) {
   const uniq = [...new Set(keywords.map((k) => k.toLowerCase()))];
   const cache = await buildWordCache(uniq);
@@ -168,80 +167,77 @@ export async function generateQuiz(keywords, type = "mixed", total = 10) {
 
     let q;
     if (choice === "fill") q = makeFillQuestion(word, meta, uniq);
-    if (choice === "definition")
-      q = await makeDefinitionQuestion(word, meta, uniq, cache);
-    if (choice === "translation")
-      q = makeTranslationQuestion(word, meta, uniq, cache);
+    if (choice === "definition") q = await makeDefinitionQuestion(word, meta, uniq, cache);
+    if (choice === "translation") q = makeTranslationQuestion(word, meta, uniq, cache);
 
     if (q && !questions.some((x) => x.question === q.question)) {
       questions.push(q);
     }
 
     i++;
-    if (i > uniq.length * 10) break;
+    if (i > uniq.length * 10) break; // safety
   }
 
   return questions.slice(0, total);
 }
 
-// ---------------- Controllers ----------------
-export async function createQuiz(req, res) {
-  try {
-    const { title, text, keywords, difficulty = "basic", type = "mixed" } =
-      req.body;
+// -------------------- Create Quiz Service --------------------
+export async function createQuizService({ title, text, type = "mixed", difficulty = "basic", userId }) {
+  if (!title || !text) throw new Error("Title and text required");
 
-    if (!title || !text)
-      return res.status(400).json({ message: "Title and text required" });
+  // 1️⃣ Analyze text
+  const submission = await handleTextSubmission(text, userId);
+  const keywords = submission.significantWords.map((w) => w.word);
 
-    if (!Array.isArray(keywords) || keywords.length < 5)
-      return res
-        .status(400)
-        .json({ message: "Provide at least 5 keywords for quiz generation" });
+  if (keywords.length < 5) throw new Error("Not enough keywords extracted to generate quiz");
 
-    const questions = await generateQuiz(keywords, type, 10);
+  // 2️⃣ Generate quiz questions
+  const questions = await generateQuiz(keywords, type, 10);
 
-    const quiz = new Quiz({
-      title,
-      text,
-      difficulty,
-      type,
-      keywords,
-      questions,
-      createdBy: req.user?.id || null,
-    });
+  // 3️⃣ Save quiz to DB
+  const quiz = await Quiz.create({
+    title,
+    text,
+    difficulty,
+    type,
+    keywords,
+    questions,
+    submissionId: submission.submissionId,
+    createdBy: userId,
+  });
 
-    await quiz.save();
-    res.status(201).json(quiz);
-  } catch (err) {
-    console.error("Quiz creation error:", err);
-    res.status(500).json({ message: "Failed to create quiz" });
-  }
+  return { quiz, keywords, stats: submission.stats };
 }
 
+
+// --- Fetch all quizzes ---
 export async function getAllQuizzes(req, res) {
   try {
-    res.json(await Quiz.find().sort({ createdAt: -1 }));
-  } catch {
-    res.status(500).json({ message: "Error fetching quizzes" });
+    const quizzes = await Quiz.find().sort({ createdAt: -1 });
+    res.json(quizzes);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 }
 
+// --- Fetch a single quiz ---
 export async function getQuizById(req, res) {
   try {
     const quiz = await Quiz.findById(req.params.id);
-    if (!quiz) return res.status(404).json({ message: "Not found" });
+    if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
     res.json(quiz);
-  } catch {
-    res.status(500).json({ message: "Error fetching quiz" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 }
 
+// --- Delete quiz ---
 export async function deleteQuiz(req, res) {
   try {
     const quiz = await Quiz.findByIdAndDelete(req.params.id);
-    if (!quiz) return res.status(404).json({ message: "Not found" });
-    res.json({ message: "Deleted" });
-  } catch {
-    res.status(500).json({ message: "Error deleting quiz" });
+    if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
+    res.json({ message: 'Quiz deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 }
