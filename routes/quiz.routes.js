@@ -1,6 +1,6 @@
 import express from 'express';
+import { createQuizController } from '../controllers/quiz.controller.js';
 import {
-  createQuiz,
   getAllQuizzes,
   getQuizById,
   deleteQuiz
@@ -8,7 +8,7 @@ import {
 
 const router = express.Router();
 
-router.post('/', createQuiz);
+router.post('/', createQuizController);
 router.get('/', getAllQuizzes);
 router.get('/:id', getQuizById);
 router.delete('/:id', deleteQuiz);

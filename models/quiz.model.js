@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const questionSchema = new mongoose.Schema({
-  type: { type: String, enum: ['fill', 'translation', 'definition'], required: true },
+  type: { type: String, enum: ['fill', 'translation', 'definition', 'mixed'], required: true },
   question: String,
   answer: String,
   options: [String]
