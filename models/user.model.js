@@ -1,23 +1,51 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema(
+const MAX_TEXT_LENGTH = 2000;  // Adjusted for ~300 words (approx 6 chars per word + buffer)
+const MAX_KEYWORD_COUNT = 20;  
+const MAX_WORD_LENGTH = 50; 
+const textSubmissionSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
-    surname: { type: String, required: true },
-    email: { 
-      type: String, 
-      required: true, 
-      unique: true,
-      lowercase: true,
-      trim: true,
-      match: [/^\S+@\S+\.\S+$/, 'Invalid email format']
+    user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "User ID is required"],
+      index: true,
     },
-    password: { type: String, required: true },
-    role: { type: String, enum: ['user', 'teacher', 'admin'], default: 'user' },
-    resetPasswordToken: { type: String },
-    resetPasswordExpires: { type: Date }
+    raw_text: { 
+      type: String, 
+      required: [true, "Text content is required"],
+      trim: true,
+      minlength: [10, "Text must be at least 10 characters long"],
+      maxlength: [
+        MAX_TEXT_LENGTH,
+        `Text cannot exceed ${MAX_TEXT_LENGTH} characters (approx 300 words)`,
+      ],
+    },
+    normalized_words: [
+      { type: [String],
+        default: [],
+        validate: {
+          validator: function (array) {
+            return array.every((w) => w.length <= MAX_WORD_LENGTH);
+          },
+          message: `A word exceeds ${MAX_WORD_LENGTH} characters`,
+        },
+      }
+    ],
+    top_keywords: {
+      type: [String],
+      default: [],
+      validate: [
+        {
+          validator: function (val) {
+            return val.length <= MAX_KEYWORD_COUNT;
+          },
+          message: `Cannot store more than ${MAX_KEYWORD_COUNT} keywords`,
+        },
+      ],
+    },
   },
-  { timestamps: true }
+  { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
 
-export default mongoose.model('User', userSchema);
+export default mongoose.model("TextSubmission", textSubmissionSchema);
