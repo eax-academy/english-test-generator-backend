@@ -18,7 +18,8 @@ const quizSchema = new mongoose.Schema(
   },
   { timestamps: true,
     toJSON: { virtuals: true },
-    toObject: { virtuals: true } }
+    toObject: { virtuals: true }
+  }
 );
 
 export default mongoose.model('Quiz', quizSchema);
