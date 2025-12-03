@@ -3,7 +3,7 @@ import crypto from "crypto";
 import User from "../models/user.model.js";
 import { hashPassword, comparePassword } from "../utils/password.utils.js";
 import { sendEmail } from "../utils/email.js";
-
+import JwtClaims from "../utils/JwtClaims.js";
 
 export async function registerUser({ name, surname, email, password }) {
   const existing = await User.findOne({ email });
@@ -23,11 +23,23 @@ export async function loginUser({ email, password }) {
   const valid = await comparePassword(password, user.password);
   if (!valid) throw new Error("Invalid credentials");
 
-  const token = jwt.sign(
-    { id: user._id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" }
+  // Calculate expiration (e.g., 7 days from now)
+  const sevenDays = 7 * 24 * 60 * 60 * 1000;
+  const expDate = new Date(Date.now() + sevenDays);
+
+  //Create the Claims Instance
+  const claims = new JwtClaims(
+    user._id.toString(), 
+    user.role || "user", 
+    expDate
   );
+
+  //Generate the token
+  const token = jwt.sign(
+    claims.toPayload(),
+    process.env.JWT_SECRET
+  );
+
   return { token, user };
 }
 
@@ -41,7 +53,9 @@ export const requestPasswordReset = async (email) => {
   user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
   await user.save();
 
-  const resetLink = `http://localhost:5002/reset-password/${token}`;
+  //environment variable
+  const clientUrl = process.env.CLIENT_URL || "http://localhost:5002";
+  const resetLink = `${clientUrl}/reset-password/${token}`;
 
   // Return the promise of sending email
   await sendEmail(
