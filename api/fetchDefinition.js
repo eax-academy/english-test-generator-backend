@@ -1,33 +1,78 @@
 export async function fetchDefinitionAndPos(word) {
+  if (!word || typeof word !== "string" || !word.trim()) return null;
+
   try {
     const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error("API error");
+    if (!res.ok) return null;
 
     const data = await res.json();
-    const entry = Array.isArray(data) && data.length ? data[0] : null;
+    if (!Array.isArray(data) || !data.length) return null;
 
-    if (!entry || !entry.meanings?.length) {
-      return { definition: "Definition unavailable", pos: "noun", example: null };
+    let defs = [];
+
+    for (const entry of data) {
+      if (!entry.meanings) continue;
+      for (const meaning of entry.meanings) {
+        if (!meaning.definitions) continue;
+        for (const def of meaning.definitions) {
+          if (def.definition) {
+            defs.push({
+              definition: def.definition.trim(),
+              pos: meaning.partOfSpeech || guessPos(word),
+              example: def.example?.trim() || "",
+            });
+          }
+        }
+      }
     }
 
-    // Pick first meaning
-    const meaning = entry.meanings[0];
-    const definition = meaning.definitions?.[0]?.definition || "Definition unavailable";
-    const pos = meaning.partOfSpeech || guessPos(word);
-    const example = meaning.definitions?.[0]?.example || null;
+    if (!defs.length) return null;
 
-    return { definition, pos, example };
-  } catch {
-    return { definition: "Definition unavailable", pos: guessPos(word), example: null };
+    defs.forEach(d => d.score = scoreDefinition(word, d.definition));
+    defs.sort((a, b) => b.score - a.score);
+
+    return {
+      ...defs[0],
+      isVerified: true,
+      allDefinitions: defs,
+    };
+  } catch (err) {
+    console.warn("Definition fetch error:", word, err);
+    return null;
   }
 }
 
 export function guessPos(word) {
+  if (!word) return "noun";
   const w = word.toLowerCase();
   if (w.endsWith("ly")) return "adverb";
-  if (/(ing|ize|ise|ate|fy|en)$/.test(w)) return "verb";
-  if (/(ed|ive|ous|al|able|ic|y|ful|less)$/.test(w)) return "adjective";
+  if (/(ing|ize|ise|ate|fy|en|es|s)$/.test(w)) return "verb";
+  if (/(ed|ive|ous|al|able|ic|y|ful|less|est|er)$/.test(w)) return "adjective";
   if (/^[A-Z]/.test(word)) return "proper";
   return "noun";
+}
+
+function scoreDefinition(word, definition) {
+  if (!definition) return 0;
+
+  let score = 0;
+  const lower = definition.toLowerCase();
+
+  if (definition.length < 80) score += 3;
+  else if (definition.length < 120) score += 2;
+  else score += 1;
+
+  if (lower.includes(word.toLowerCase())) score += 2;
+
+  const rareWords = [
+    "archaic", "obsolete", "rare", "medicine", "biology",
+    "physics", "chemistry", "finance", "computing", "law"
+  ];
+  if (rareWords.some(rw => lower.includes(rw))) score -= 3;
+
+  // Slight bonus for simple words like common, basic, easy
+  if (lower.match(/\b(common|basic|simple|usual|main|often|usually)\b/)) score += 2;
+
+  return score;
 }
