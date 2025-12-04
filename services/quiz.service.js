@@ -3,80 +3,58 @@ import { handleTextSubmission } from "./analyze.service.js";
 import { translateToArmenian } from "../api/translateToArmenian.js";
 import { fetchDefinitionAndPos } from "../api/fetchDefinition.js";
 
-// -------------------- Utility Functions --------------------
-function capitalize(s) {
-  return s ? s[0].toUpperCase() + s.slice(1) : "";
-}
-
+// -------------------- Utilities --------------------
 function escapeRegExp(s = "") {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function shuffleArray(arr = []) {
   return arr
-    .map((x) => ({ x, r: Math.random() }))
+    .map(x => ({ x, r: Math.random() }))
     .sort((a, b) => a.r - b.r)
-    .map((o) => o.x);
+    .map(o => o.x);
 }
 
-function guessPos(word) {
-  const w = word.toLowerCase();
-  if (w.endsWith("ly")) return "adverb";
-  if (/(ing|ize|ise|ate|fy|en)$/.test(w)) return "verb";
-  if (/(ed|ive|ous|al|able|ic|y|ful|less)$/.test(w)) return "adjective";
-  if (/^[A-Z]/.test(word)) return "proper";
-  return "noun";
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
-// -------------------- Build Word Metadata Cache --------------------
-async function buildWordCache(keywords = []) {
-  const cache = new Map();
-  await Promise.all(
-    keywords.map(async (k) => {
-      const [translation, defPos] = await Promise.all([
-        translateToArmenian(k),
-        fetchDefinitionAndPos(k),
-      ]);
-      const pos = defPos.pos || guessPos(k);
-      cache.set(k, { translation, definition: defPos.definition, pos });
-    })
-  );
-  return cache;
+function replaceWordWithBlank(sentence, word) {
+  const regex = new RegExp(`\\b${escapeRegExp(word)}\\b`, "i");
+  return regex.test(sentence) ? sentence.replace(regex, "____") : `Fill in the blank: ${word}`;
 }
 
-// -------------------- Question Templates --------------------
-const TEMPLATES = {
-  verb: [
-    (w) => `I ${w} every day.`,
-    (w) => `They will ${w} tomorrow.`,
-    (w) => `Can you ${w} without help?`,
-    (w) => `We often ${w} together.`,
-  ],
-  noun: [
-    (w) => `The ${w} is important.`,
-    (w) => `I saw a ${w} yesterday.`,
-    (w) => `${capitalize(w)} is amazing.`,
-    (w) => `Many ${w}s are here.`,
-  ],
-  adjective: [
-    (w) => `It was a very ${w} day.`,
-    (w) => `She has a ${w} idea.`,
-    (w) => `They wore ${w} clothes.`,
-    (w) => `What a ${w} experience!`,
-  ],
-  proper: [
-    (w) => `${capitalize(w)} is famous for its services.`,
-    (w) => `Many people use ${capitalize(w)} every day.`,
-  ],
-};
+// -------------------- Random Sentence Generator --------------------
+function generateRandomSentence(word, pos) {
+  const subjects = ["The scientist", "An artist", "The engineer", "The teacher"];
+  const verbs = ["observes", "analyzes", "creates", "examines"];
+  const objects = ["a phenomenon", "a problem", "a discovery", "an experiment"];
 
-// -------------------- Question Generators --------------------
-function makeFillQuestion(word, meta, pool) {
+  if (pos === "verb") return `I will ${word} the task.`;
+  if (pos === "noun") return `${pickRandom(subjects)} notices ${word}.`;
+  if (pos === "adjective") return `It was a ${word} day.`;
+  if (pos === "adverb") return `She runs ${word}.`;
+
+  return `${pickRandom(subjects)} encounters ${word}.`;
+}
+
+// -------------------- Fill Question Generator --------------------
+async function makeFillQuestion(word, pool = [], cache, text) {
+  const meta = cache.get(word) || {};
   const pos = meta.pos || "noun";
-  const templates = TEMPLATES[pos] || TEMPLATES.noun;
-  const sentence = templates[Math.floor(Math.random() * templates.length)](word);
-  const questionText = sentence.replace(new RegExp(`\\b${escapeRegExp(word)}\\b`, "i"), "____");
-  const distractors = shuffleArray(pool.filter((k) => k !== word)).slice(0, 3);
+
+  // Extract sentences containing the word from the text
+  const sentences = text
+    .split(/(?<=[.!?])\s+/)
+    .filter(s => new RegExp(`\\b${escapeRegExp(word)}\\b`, "i").test(s));
+
+  let sentence = sentences.length ? pickRandom(sentences) : generateRandomSentence(word, pos);
+  const questionText = replaceWordWithBlank(sentence, word);
+
+  // Distractors: other words of same POS
+  const distractors = shuffleArray(
+    pool.filter(k => k.toLowerCase() !== word.toLowerCase() && (cache.get(k)?.pos || "") === pos)
+  ).slice(0, 3);
 
   return {
     type: "fill",
@@ -86,12 +64,13 @@ function makeFillQuestion(word, meta, pool) {
   };
 }
 
+// -------------------- Definition & Translation --------------------
 async function makeDefinitionQuestion(word, meta, keywords, cache) {
-  const correct = meta.definition;
+  const correct = meta.definition || "Definition not found";
   const distractors = shuffleArray(
     keywords
-      .filter((k) => k !== word)
-      .map((k) => cache.get(k)?.definition)
+      .filter(k => k !== word)
+      .map(k => cache.get(k)?.definition)
       .filter(Boolean)
   ).slice(0, 3);
 
@@ -104,11 +83,11 @@ async function makeDefinitionQuestion(word, meta, keywords, cache) {
 }
 
 function makeTranslationQuestion(word, meta, keywords, cache) {
-  const correct = meta.translation;
+  const correct = meta.translation || word;
   const distractors = shuffleArray(
     keywords
-      .filter((k) => k !== word)
-      .map((k) => cache.get(k)?.translation)
+      .filter(k => k !== word)
+      .map(k => cache.get(k)?.translation)
       .filter(Boolean)
   ).slice(0, 3);
 
@@ -120,31 +99,50 @@ function makeTranslationQuestion(word, meta, keywords, cache) {
   };
 }
 
-// -------------------- Main Quiz Generator --------------------
-export async function generateQuiz(keywords, type = "mixed", total = 10) {
-  const uniq = [...new Set(keywords.map((k) => k.toLowerCase()))];
+// -------------------- Build Word Cache --------------------
+const wordCache = new Map();
+
+async function buildWordCache(keywords = []) {
+  await Promise.all(
+    keywords.map(async k => {
+      if (!wordCache.has(k)) {
+        const [translation, defPos] = await Promise.all([
+          translateToArmenian(k),
+          fetchDefinitionAndPos(k),
+        ]);
+        wordCache.set(k, {
+          translation,
+          definition: defPos?.definition || k,
+          pos: defPos?.pos || "noun",
+          example: defPos?.example || "",
+        });
+      }
+    })
+  );
+  return wordCache;
+}
+
+// -------------------- Quiz Generator --------------------
+export async function generateQuiz(keywords, text, type = "mixed", total = 10) {
+  const uniq = shuffleArray([...new Set(keywords.map(k => k.toLowerCase()))]);
   const cache = await buildWordCache(uniq);
 
   const questions = [];
   const qTypes = type === "mixed" ? ["fill", "definition", "translation"] : [type];
-
   let i = 0;
-  while (questions.length < total) {
+
+  while (questions.length < total && i < uniq.length * 10) {
     const word = uniq[i % uniq.length];
-    const meta = cache.get(word);
-    const choice = qTypes[Math.floor(Math.random() * qTypes.length)];
+    const meta = cache.get(word) || {};
+    const choice = pickRandom(qTypes);
 
     let q;
-    if (choice === "fill") q = makeFillQuestion(word, meta, uniq);
+    if (choice === "fill") q = await makeFillQuestion(word, uniq, cache, text);
     if (choice === "definition") q = await makeDefinitionQuestion(word, meta, uniq, cache);
     if (choice === "translation") q = makeTranslationQuestion(word, meta, uniq, cache);
 
-    if (q && !questions.some((x) => x.question === q.question)) {
-      questions.push(q);
-    }
-
+    if (q && !questions.some(x => x.question === q.question)) questions.push(q);
     i++;
-    if (i > uniq.length * 10) break; // safety
   }
 
   return questions.slice(0, total);
@@ -154,16 +152,13 @@ export async function generateQuiz(keywords, type = "mixed", total = 10) {
 export async function createQuizService({ title, text, type = "mixed", difficulty = "basic", userId }) {
   if (!title || !text) throw new Error("Title and text required");
 
-  // 1️⃣ Analyze text
   const submission = await handleTextSubmission(text, userId);
-  const keywords = submission.significantWords.map((w) => w.word);
+  const keywords = submission.significantWords.map(w => w.word);
 
-  if (keywords.length < 5) throw new Error("Not enough keywords extracted to generate quiz");
+  if (keywords.length < 5) throw new Error("Not enough keywords for quiz");
 
-  // 2️⃣ Generate quiz questions
-  const questions = await generateQuiz(keywords, type, 10);
+  const questions = await generateQuiz(keywords, text, type, 10);
 
-  // 3️⃣ Save quiz to DB
   const quiz = await Quiz.create({
     title,
     text,
@@ -178,8 +173,7 @@ export async function createQuizService({ title, text, type = "mixed", difficult
   return { quiz, keywords, stats: submission.stats };
 }
 
-
-// --- Fetch all quizzes ---
+// -------------------- CRUD Endpoints --------------------
 export async function getAllQuizzes(req, res) {
   try {
     const quizzes = await Quiz.find().sort({ createdAt: -1 });
@@ -189,23 +183,21 @@ export async function getAllQuizzes(req, res) {
   }
 }
 
-// --- Fetch a single quiz ---
 export async function getQuizById(req, res) {
   try {
     const quiz = await Quiz.findById(req.params.id);
-    if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
+    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
     res.json(quiz);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 }
 
-// --- Delete quiz ---
 export async function deleteQuiz(req, res) {
   try {
     const quiz = await Quiz.findByIdAndDelete(req.params.id);
-    if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
-    res.json({ message: 'Quiz deleted successfully' });
+    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
+    res.json({ message: "Quiz deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
