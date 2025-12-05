@@ -59,20 +59,24 @@ function scoreDefinition(word, definition) {
   let score = 0;
   const lower = definition.toLowerCase();
 
+  // Shorter defs usually better
   if (definition.length < 80) score += 3;
   else if (definition.length < 120) score += 2;
   else score += 1;
 
-  if (lower.includes(word.toLowerCase())) score += 2;
+  // Penalize if definition uses the word itself
+  const regex = new RegExp(`\\b${word.toLowerCase()}\\b`, "i");
+  if (regex.test(lower)) score -= 4;
 
+  // Penalize rare or domain-specific defs
   const rareWords = [
     "archaic", "obsolete", "rare", "medicine", "biology",
     "physics", "chemistry", "finance", "computing", "law"
   ];
   if (rareWords.some(rw => lower.includes(rw))) score -= 3;
 
-  // Slight bonus for simple words like common, basic, easy
   if (lower.match(/\b(common|basic|simple|usual|main|often|usually)\b/)) score += 2;
 
   return score;
 }
+
