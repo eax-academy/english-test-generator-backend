@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 
-const MAX_TEXT_LENGTH = 2000;  // Adjusted for ~300 words (approx 6 chars per word + buffer)
-const MAX_KEYWORD_COUNT = 20;  
-const MAX_WORD_LENGTH = 50; 
+const MAX_TEXT_LENGTH = 2000; // Adjusted for ~300 words (approx 6 chars per word + buffer)
+const MAX_KEYWORD_COUNT = 20;
+const MAX_WORD_LENGTH = 50;
 const textSubmissionSchema = new mongoose.Schema(
   {
     user_id: {
@@ -11,8 +11,8 @@ const textSubmissionSchema = new mongoose.Schema(
       required: [true, "User ID is required"],
       index: true,
     },
-    raw_text: { 
-      type: String, 
+    raw_text: {
+      type: String,
       required: [true, "Text content is required"],
       trim: true,
       minlength: [10, "Text must be at least 10 characters long"],
@@ -22,7 +22,8 @@ const textSubmissionSchema = new mongoose.Schema(
       ],
     },
     normalized_words: [
-      { type: [String],
+      {
+        type: [String],
         default: [],
         validate: {
           validator: function (array) {
@@ -30,7 +31,7 @@ const textSubmissionSchema = new mongoose.Schema(
           },
           message: `A word exceeds ${MAX_WORD_LENGTH} characters`,
         },
-      }
+      },
     ],
     top_keywords: {
       type: [String],
@@ -48,4 +49,7 @@ const textSubmissionSchema = new mongoose.Schema(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
 
-export default mongoose.model("TextSubmission", textSubmissionSchema);
+const TextSubmission =
+  mongoose.models.TextSubmission ||
+  mongoose.model("TextSubmission", textSubmissionSchema);
+export default TextSubmission;

@@ -1,51 +1,53 @@
 import mongoose from "mongoose";
+const ALLOWED_ROLES = ["user", "teacher", "admin"]; //TODO: teacher?
 
-const MAX_TEXT_LENGTH = 2000;  // Adjusted for ~300 words (approx 6 chars per word + buffer)
-const MAX_KEYWORD_COUNT = 20;  
-const MAX_WORD_LENGTH = 50; 
-const textSubmissionSchema = new mongoose.Schema(
+const userSchema = new mongoose.Schema(
   {
-    user_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "User ID is required"],
+    name: {
+      type: String,
+      required: [true, "Name is required"],
+      trim: true,
+      minlength: [2, "Name must be at least 2 characters long"],
+      maxlength: [50, "Name cannot exceed 50 characters"],
+    },
+    surname: {
+      type: String,
+      required: [true, "Surname is required"],
+      trim: true,
+      minlength: [2, "Surname must be at least 2 characters long"],
+      maxlength: [50, "Surname cannot exceed 50 characters"],
+    },
+    email: {
+      type: String,
+      required: [true, "Email is required"],
+      unique: true,
+      lowercase: true,
+      trim: true,
+      match: [/^\S+@\S+\.\S+$/, "Invalid email format"],
       index: true,
     },
-    raw_text: { 
-      type: String, 
-      required: [true, "Text content is required"],
+    password: { type: String, required: true },
+    role: {
+      type: String,
+      enum: {
+        values: ALLOWED_ROLES,
+        message: "{VALUE} is not a valid role",
+      },
+      default: "user",
       trim: true,
-      minlength: [10, "Text must be at least 10 characters long"],
-      maxlength: [
-        MAX_TEXT_LENGTH,
-        `Text cannot exceed ${MAX_TEXT_LENGTH} characters (approx 300 words)`,
-      ],
     },
-    normalized_words: [
-      { type: [String],
-        default: [],
-        validate: {
-          validator: function (array) {
-            return array.every((w) => w.length <= MAX_WORD_LENGTH);
-          },
-          message: `A word exceeds ${MAX_WORD_LENGTH} characters`,
-        },
-      }
-    ],
-    top_keywords: {
-      type: [String],
-      default: [],
-      validate: [
-        {
-          validator: function (val) {
-            return val.length <= MAX_KEYWORD_COUNT;
-          },
-          message: `Cannot store more than ${MAX_KEYWORD_COUNT} keywords`,
-        },
-      ],
+    resetPasswordToken: {
+      type: String,
+      default: undefined, // Keeps DB clean
+    },
+    resetPasswordExpires: {
+      type: Date,
+      default: undefined,
     },
   },
-  { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
+
+  //TODO: toJSON?
+  { timestamps: true }
 );
 
-export default mongoose.model("TextSubmission", textSubmissionSchema);
+export default mongoose.model("User", userSchema);
