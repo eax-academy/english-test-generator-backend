@@ -23,21 +23,17 @@ export async function loginUser({ email, password }) {
   const valid = await comparePassword(password, user.password);
   if (!valid) throw new Error("Invalid credentials");
 
-  // Calculate expiration (e.g., 7 days from now)
-  const sevenDays = 7 * 24 * 60 * 60 * 1000;
-  const expDate = new Date(Date.now() + sevenDays);
-
   //Create the Claims Instance
   const claims = new JwtClaims(
     user._id.toString(), 
     user.role || "user", 
-    expDate
   );
 
   //Generate the token
   const token = jwt.sign(
     claims.toPayload(),
-    process.env.JWT_SECRET
+    process.env.JWT_SECRET,
+    {expiresIn : '7d'}
   );
 
   return { token, user };

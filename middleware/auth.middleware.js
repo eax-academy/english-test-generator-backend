@@ -9,7 +9,7 @@ export const verifyToken = (req, res, next) => {
     const verified = jwt.verify(token, process.env.JWT_SECRET);
     // Validate the payload using your JwtClaims class
     // This ensures 'sub' is a valid ID and 'role' is a valid role.
-    const claims = JwtClaims.fromPayload(decoded);
+    const claims = JwtClaims.fromPayload(verified);
     req.user = claims;
     next();
   } catch (err) {
