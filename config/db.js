@@ -9,3 +9,12 @@ export const connectDB = async () => {
     process.exit(1);
   }
 };
+
+export const disconnectDB = async () => {
+  try {
+    await mongoose.connection.close();
+    console.log("👋 MongoDB disconnected gracefully");
+  } catch (error) {
+    console.error(`❌ MongoDB Disconnect Error: ${error.message}`);
+  }
+};

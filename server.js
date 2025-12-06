@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import morgan from "morgan";
-import { connectDB } from "./config/db.js";
+import { connectDB, disconnectDB } from "./config/db.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import quizRoutes from "./routes/quiz.routes.js";
@@ -43,4 +43,49 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+const server = app.listen(PORT, () =>
+  console.log(`✅ Server running on port ${PORT}`)
+);
+
+const handleTermination = async (signal) => {
+  console.log(`\n${signal} received. Initiating termination sequence...`);
+
+  const forceExitTimeout = setTimeout(() => {
+    console.error("⚠️  Termination timed out. Forcing exit.");
+    process.exit(1);
+  }, 10000).unref();
+
+  try {
+    // Stop accepting new requests
+    server.close(async () => {
+      console.log("🔒 HTTP server closed");
+
+      try {
+        await disconnectDB();
+        console.log("Database disconnected");
+        process.exit(0); // Clean exit
+      } catch (err) {
+        console.error("Error during database disconnect:", err);
+        process.exit(1);
+      }
+    });
+  } catch (err) {
+    console.error("Error during server closure:", err);
+    process.exit(1);
+  }
+};
+
+// Listen for termination signals
+process.on("SIGTERM", () => handleTermination("SIGTERM")); // For Cloud/Docker stops
+process.on("SIGINT", () => handleTermination("SIGINT")); // For Ctrl + C in terminal
+
+// Optional: Handle unexpected crashes
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+  handleTermination("UNCAUGHT_EXCEPTION");
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  handleTermination("UNHANDLED_REJECTION");
+});
