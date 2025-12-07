@@ -25,15 +25,15 @@ export async function loginUser({ email, password }) {
 
   //Create the Claims Instance
   const claims = new JwtClaims(
-    user._id.toString(), 
-    user.role || "user", 
+    user._id.toString(),
+    user.role || "user",
   );
 
   //Generate the token
   const token = jwt.sign(
     claims.toPayload(),
     process.env.JWT_SECRET,
-    {expiresIn : '7d'}
+    { expiresIn: '7d' }
   );
 
   return { token, user };
@@ -50,7 +50,7 @@ export const requestPasswordReset = async (email) => {
   await user.save();
 
   //environment variable
-  const clientUrl = process.env.CLIENT_URL || "http://localhost:5002";
+  const clientUrl = process.env.CLIENT_URL || "http://localhost:5000";
   const resetLink = `${clientUrl}/reset-password/${token}`;
 
   // Return the promise of sending email
