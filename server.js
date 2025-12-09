@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+dotenv.config();
 import morgan from "morgan";
 import { connectDB, disconnectDB } from "./config/db.js";
 
@@ -12,11 +13,18 @@ import usersRouter from "./routes/users.routes.js";
 import analyzeRouter from "./routes/analyze.routes.js";
 import loggerMiddleware from "./middleware/logger.middleware.js";
 
-dotenv.config();
+import { config } from "./config/env.js"; // ← ЭТО ОБЯЗАТЕЛЬНО
+
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:5173", // Your Frontend URL
+    credentials: true, // Allow cookies to be sent
+  })
+);
+
 app.use(morgan("dev"));
 app.use(express.json());
 
@@ -42,7 +50,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Internal Server Error" });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = config.port; //|| 5000;
 const server = app.listen(PORT, () =>
   console.log(`✅ Server running on port ${PORT}`)
 );

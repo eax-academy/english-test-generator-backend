@@ -36,6 +36,13 @@ const userSchema = new mongoose.Schema(
       default: "user",
       trim: true,
     },
+    // --- AUTH SYSTEM REQUIREMENT ---
+    // Stores the HASH of the refresh token. 
+    // If the DB is hacked, they can't create access tokens.
+    refreshTokenHash: {
+      type: String,
+      default: null
+    },
     resetPasswordToken: {
       type: String,
       default: undefined, // Keeps DB clean
@@ -47,7 +54,20 @@ const userSchema = new mongoose.Schema(
   },
 
   //TODO: toJSON?
-  { timestamps: true }
+  { 
+    timestamps: true,
+    toJSON: {
+      transform: function (doc, ret) {
+        // These fields are internal/secure and should never go to the frontend
+        delete ret.password;
+        delete ret.refreshTokenHash;
+        delete ret.resetPasswordToken;
+        delete ret.resetPasswordExpires;
+        delete ret.__v; // Mongoose version key
+        return ret;
+      } 
+    }
+  }
 );
 
 export default mongoose.model("User", userSchema);
