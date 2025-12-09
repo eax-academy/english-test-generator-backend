@@ -278,9 +278,9 @@ export async function handleTextSubmission(text, userId) {
       top_keywords: significantWords.map((w) => w.word),
     });
 
-    // Step 5: Return Result
-    return formatResponse(newSubmission, uniqueWords, significantWords, fullAnalysis);
-
+    
+    const response = formatResponse(newSubmission, uniqueWords, significantWords, fullAnalysis);
+    return response.data
   } catch (error) {
     console.error("Error in handleTextSubmission:", error);
     return { success: false, error: "Internal processing error." };
