@@ -4,6 +4,11 @@ import dotenv from "dotenv";
 dotenv.config();
 import morgan from "morgan";
 import { connectDB, disconnectDB } from "./config/db.js";
+import { connectRedis, disconnectRedis } from "./config/redis.js";
+import {
+  globalLimiter,
+  apiLimiter,
+} from "./middleware/ratelimiter.middleware.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import quizRoutes from "./routes/quiz.routes.js";
@@ -25,6 +30,8 @@ app.use(
   })
 );
 
+app.use(globalLimiter);
+
 app.use(morgan("dev"));
 app.use(express.json());
 
@@ -33,12 +40,12 @@ connectDB();
 
 // Routes
 app.use(loggerMiddleware);
-app.use("/api/v1", authRoutes); // /api/v1/register, /api/v1/login
-app.use("/api/quiz", quizRoutes);
+app.use("/api/v1", globalLimiter,authRoutes); // /api/v1/register, /api/v1/login
+app.use("/api/quiz", apiLimiter ,quizRoutes);
 app.use("/api/v1", adminRouter);
-app.use("/api/v1/tests", testsRouter);
-app.use("/api/v1/users", usersRouter);
-app.use("/api/v1/", analyzeRouter);
+app.use("/api/v1/tests", apiLimiter ,testsRouter);
+app.use("/api/v1/users", apiLimiter, usersRouter);
+app.use("/api/v1/", apiLimiter , analyzeRouter);
 
 app.get("/", (req, res) =>
   res.json({ message: "🧠 English Test Generator Backend is running" })
@@ -50,10 +57,23 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Internal Server Error" });
 });
 
-const PORT = config.port; //|| 5000;
-const server = app.listen(PORT, () =>
-  console.log(`✅ Server running on port ${PORT}`)
-);
+// const startServer = async () => {
+//   try {
+//     await connectDB();
+//     await connectRedis();
+
+const PORT = config.port || 5000;
+const server = app.listen(PORT, () => console.log(`:white_tick: Server running on port ${PORT}`));
+//   } catch (error) {
+//     console.error("Failed to start server:", error);
+//     process.exit(1);
+//   }
+// };
+
+await connectDB();
+await connectRedis();
+
+// startServer();
 
 const handleTermination = async (signal) => {
   console.log(`\n${signal} received. Initiating termination sequence...`);
@@ -70,6 +90,7 @@ const handleTermination = async (signal) => {
 
       try {
         await disconnectDB();
+        await disconnectRedis();
         console.log("Database disconnected");
         process.exit(0); // Clean exit
       } catch (err) {
