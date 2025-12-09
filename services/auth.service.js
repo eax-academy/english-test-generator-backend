@@ -23,19 +23,18 @@ export async function loginUser({ email, password }) {
   const valid = await comparePassword(password, user.password);
   if (!valid) throw new Error("Invalid credentials");
 
-  //Create the Claims Instance
+  const exp = Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7);
+
   const claims = new JwtClaims(
     user._id.toString(),
     user.role || "user",
+    exp,
   );
 
-  //Generate the token
   const token = jwt.sign(
     claims.toPayload(),
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
+    process.env.JWT_SECRET
   );
-
   return { token, user };
 }
 
@@ -50,7 +49,7 @@ export const requestPasswordReset = async (email) => {
   await user.save();
 
   //environment variable
-  const clientUrl = process.env.CLIENT_URL || "http://localhost:5000";
+  const clientUrl = process.env.FRONTEND_URL || "http://localhost:5000";
   const resetLink = `${clientUrl}/reset-password/${token}`;
 
   // Return the promise of sending email
