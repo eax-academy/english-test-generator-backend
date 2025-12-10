@@ -4,7 +4,8 @@ const questionSchema = new mongoose.Schema({
   type: { type: String, enum: ['fill', 'translation', 'definition', 'mixed'], required: true },
   question: String,
   answer: String,
-  options: [String]
+  options: [String], 
+  wordId: { type: mongoose.Schema.Types.ObjectId, ref: 'Word' }
 });
 
 const quizSchema = new mongoose.Schema(
