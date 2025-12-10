@@ -1,40 +1,125 @@
-import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
-import { hashPassword, comparePassword } from "../utils/password.utils.js";
+import * as crypto from "../utils/crypto.js";
+import { sendEmail } from "../utils/email.js";
+import nodeCrypto from "node:crypto";
 
-export async function register(req, res) {
-  try {
-    const { name, surname, email, password } = req.body;
-    const existing = await User.findOne({ email });
-    if (existing)
-      return res.status(400).json({ message: "User already exists" });
+export async function registerUser({ name, surname, email, password }) {
+  const existing = await User.findOne({ email });
+  if (existing) throw new Error("User already exists");
 
-    const hashed = await hashPassword(password);
-    const user = new User({ name, surname, email, password: hashed });
+  const hashedPassword = await crypto.hashPassword(password);
+  const user = await User.create({
+    name,
+    surname,
+    email,
+    password: hashedPassword,
+  });
+  return user;
+}
+
+/**
+ * Login user and issue Access + Refresh Tokens
+ */
+export async function loginUser({ email, password }) {
+  const user = await User.findOne({ email });
+  if (!user) throw new Error("User not found");
+
+  const valid = await crypto.comparePassword(password, user.password);
+  if (!valid) throw new Error("Invalid credentials");
+
+  return generateTokensAndSave(user);
+}
+
+/**
+ * Handle Token Refresh (Rotation)
+ */
+export const refreshUserToken = async (incomingToken) => {
+  if (!incomingToken) throw new Error("No token provided");
+
+  // 1. Verify JWT Signature
+  const decoded = crypto.verifyRefreshToken(incomingToken);
+  if (!decoded) throw new Error("Invalid token");
+
+  // 2. Find User
+  const user = await User.findById(decoded.sub);
+  if (!user || !user.refreshTokenHash) throw new Error("Access denied");
+
+  // 3. Security: Check if token matches DB hash (SHA-256)
+  const isMatch = crypto.compareToken(incomingToken, user.refreshTokenHash);
+
+  if (!isMatch) {
+    // Theft detected! Revoke access.
+    console.error(`Reuse Detected for user ${user._id}`);
+    user.refreshTokenHash = null;
     await user.save();
-
-    res.status(201).json({ message: "Registration successful" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    throw new Error("Reuse detected");
   }
-}
 
-export async function login(req, res) {
-  try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+  // 4. Rotate: Issue new tokens and SAVE User
+  return generateTokensAndSave(user);
+};
 
-    const valid = await comparePassword(password, user.password);
-    if (!valid) return res.status(401).json({ message: "Invalid credentials" });
+export const requestPasswordReset = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) throw new Error("User not found");
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-    res.json({ message: "Login successful", token });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-}
+  const resetToken = nodeCrypto.randomBytes(32).toString("hex");
+  user.resetPasswordToken = resetToken;
+  user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+  await user.save();
+
+  //environment variable
+  const clientUrl = process.env.CLIENT_URL || "http://localhost:5002";
+  const resetLink = `${clientUrl}/reset-password/${resetToken}`;
+
+  // Return the promise of sending email
+  await sendEmail(
+    user.email,
+    "Password Reset Request",
+    `<h1>Reset Your Password</h1><p>Click here: <a href="${resetLink}">${resetLink}</a></p>`
+  );
+  return true;
+};
+
+/**
+ * Confirm Password Reset
+ */
+export const resetUserPassword = async (token, newPassword) => {
+  const user = await User.findOne({
+    resetPasswordToken: token,
+    resetPasswordExpires: { $gt: Date.now() },
+  });
+
+  if (!user) throw new Error("Invalid or expired token");
+
+  user.password = await crypto.hashPassword(newPassword);
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpires = undefined;
+  await user.save();
+  return true;
+};
+
+export const logoutUser = async (userId) => {
+  // Clear the refresh hash to revoke access
+  await User.findByIdAndUpdate(userId, { refreshTokenHash: null });
+};
+
+// ==========================================
+// INTERNAL HELPER (The "Saver")
+// ==========================================
+const generateTokensAndSave = async (user) => {
+  const payload = { sub: user._id, role: user.role };
+
+  // Generate JWTs
+  const accessToken = crypto.signAccessToken(payload);
+  const refreshToken = crypto.signRefreshToken({ sub: user._id });
+
+  // CRITICAL STEP: Hash the refresh token before saving
+  // We use SHA-256 (hashToken) because Bcrypt is too slow and has length limits
+  user.refreshTokenHash = crypto.hashToken(refreshToken);
+
+  // THIS IS WHERE WE SAVE THE USER ON LOGIN
+  await user.save();
+
+  return { accessToken, refreshToken, user };
+};

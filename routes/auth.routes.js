@@ -1,10 +1,23 @@
-import express from 'express';
-import { register, login } from '../services/auth.service.js';
+import express from "express";
+import * as authContoller from "../controllers/auth.controllers.js";
+import { verifyToken } from "../middleware/auth.middleware.js";
+
+import { registrationLimiter, authLimiter } from '../middleware/ratelimiter.middleware.js';
 
 const router = express.Router();
-router.post('/register', register);
-router.post('/login', login);
+
+router.post("/register", registrationLimiter ,authContoller.register);
+router.post("/login", authLimiter,authContoller.login);
+router.post("/refresh", authContoller.refresh);
+router.post("/forgot-password", authContoller.forgotPassword);
+router.post("/reset-password", authContoller.resetPassword);
+
+router.post("/logout", verifyToken, authContoller.logout);
+router.get("/me", verifyToken, (req, res) => {
+  res.json({
+    id: req.user.sub,
+    role: req.user.role,
+  });
+});
 
 export default router;
-
-
