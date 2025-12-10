@@ -1,3 +1,6 @@
+// ===============================
+// Fetch Best Definition + POS
+// ===============================
 export async function fetchDefinitionAndPos(word) {
   if (!word || typeof word !== "string" || !word.trim()) return null;
 
@@ -13,8 +16,10 @@ export async function fetchDefinitionAndPos(word) {
 
     for (const entry of data) {
       if (!entry.meanings) continue;
+
       for (const meaning of entry.meanings) {
         if (!meaning.definitions) continue;
+
         for (const def of meaning.definitions) {
           if (def.definition) {
             defs.push({
@@ -29,7 +34,31 @@ export async function fetchDefinitionAndPos(word) {
 
     if (!defs.length) return null;
 
-    defs.forEach(d => d.score = scoreDefinition(word, d.definition));
+    // Optional: high-frequency word overrides for quizzes
+    const commonWordOverrides = {
+      republic: "A government in which the people elect representatives.",
+      democratic: "Based on social equality and the principles of democracy.",
+      union: "The act of joining together or a group of states forming one entity.",
+      legislature: "A group of people who make laws.",
+      state: "A territory with its own government.",
+    };
+    const lowerWord = word.toLowerCase();
+    if (commonWordOverrides[lowerWord]) {
+      return {
+        definition: commonWordOverrides[lowerWord],
+        pos: guessPos(word),
+        example: "",
+        isVerified: true,
+        allDefinitions: defs,
+      };
+    }
+
+    // Filter out rare, obsolete, or technical definitions
+    defs = filterRareDefinitions(defs);
+    if (!defs.length) return null;
+
+    // Score and sort
+    defs.forEach(d => (d.score = scoreDefinition(word, d.definition, d.pos)));
     defs.sort((a, b) => b.score - a.score);
 
     return {
@@ -43,9 +72,13 @@ export async function fetchDefinitionAndPos(word) {
   }
 }
 
+// ===============================
+// POS Guess
+// ===============================
 export function guessPos(word) {
   if (!word) return "noun";
   const w = word.toLowerCase();
+
   if (w.endsWith("ly")) return "adverb";
   if (/(ing|ize|ise|ate|fy|en|es|s)$/.test(w)) return "verb";
   if (/(ed|ive|ous|al|able|ic|y|ful|less|est|er)$/.test(w)) return "adjective";
@@ -53,30 +86,47 @@ export function guessPos(word) {
   return "noun";
 }
 
-function scoreDefinition(word, definition) {
-  if (!definition) return 0;
+// ===============================
+// Definition Scoring
+// ===============================
+const COMMON_POS_BOOST = {
+  noun: 2,
+  verb: 2,
+  adjective: 2,
+  adverb: 1,
+  preposition: 1,
+};
 
+// Filter out rare or technical definitions
+function filterRareDefinitions(defs) {
+  const rareFlags = [
+    "archaic", "obsolete", "rare", "technical", "medicine", "biology",
+    "physics", "finance", "computing", "law", "figurative", "metaphor",
+    "idiomatic", "nautical", "military", "botany", "zoology"
+  ];
+  return defs.filter(d => !rareFlags.some(f => d.definition.toLowerCase().includes(f)));
+}
+
+// Score definitions for relevance and clarity
+function scoreDefinition(word, definition, pos) {
+  if (!definition) return 0;
   let score = 0;
   const lower = definition.toLowerCase();
 
-  // Shorter defs usually better
+  // Concise definitions preferred
   if (definition.length < 80) score += 3;
-  else if (definition.length < 120) score += 2;
-  else score += 1;
+  else if (definition.length < 150) score += 2;
+  else if (definition.length > 200) score -= 2;
 
-  // Penalize if definition uses the word itself
-  const regex = new RegExp(`\\b${word.toLowerCase()}\\b`, "i");
-  if (regex.test(lower)) score -= 4;
+  // Avoid circular definitions
+  const base = word.toLowerCase().replace(/(ing|ed|es|s)$/i, "");
+  if (new RegExp(`\\b${base}\\b`, "i").test(lower)) score -= 3;
 
-  // Penalize rare or domain-specific defs
-  const rareWords = [
-    "archaic", "obsolete", "rare", "medicine", "biology",
-    "physics", "chemistry", "finance", "computing", "law"
-  ];
-  if (rareWords.some(rw => lower.includes(rw))) score -= 3;
+  // Penalize single-word nouns
+  if (definition.split(/\s+/).length === 1 && pos === "noun") score -= 2;
 
-  if (lower.match(/\b(common|basic|simple|usual|main|often|usually)\b/)) score += 2;
+  // Reward common POS
+  if (pos && COMMON_POS_BOOST[pos]) score += COMMON_POS_BOOST[pos];
 
   return score;
 }
-
