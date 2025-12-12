@@ -1,4 +1,5 @@
 import Quiz from "../models/quiz.model.js";
+import Question from "../models/question.model.js";
 import Word from "../models/word.model.js";
 
 import { handleTextSubmission } from "./analyze.service.js";
@@ -206,32 +207,37 @@ export async function createQuizService({ title, text, type = "mixed", difficult
 
   const questions = await generateQuiz(keywords, text, type, 10);
 
-  // Ensure each question has a wordId
+  // Ensure each keyword has a Word document
   const wordDocs = await Promise.all(
     keywords.map(async (k) => {
       let word = await Word.findOne({ word: k });
       if (!word) word = await Word.create({ word: k });
-      
       return word;
     })
   );
 
-  const questionsWithWordId = questions.map((q, i) => ({
-    ...q,
-    wordId: wordDocs[i % wordDocs.length]._id
-  }));
+  // Create Questions as separate documents and get their IDs
+  const questionIds = await Promise.all(
+    questions.map(async (q, i) => {
+      const questionDoc = await Question.create({
+        ...q,
+        wordId: wordDocs[i % wordDocs.length]._id
+      });
+      return questionDoc._id;
+    })
+  );
 
+  // Create Quiz referencing the questions
   const quiz = await Quiz.create({
     title,
     textSubmissionId: submission.submissionId,
-    type,
     difficulty,
-    keywords,
-    questions: questionsWithWordId,
+    questions: questionIds,
     createdBy: userId,
   });
 
   return { quiz, stats: submission.stats };
 }
+
 
 
