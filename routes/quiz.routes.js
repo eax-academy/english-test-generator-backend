@@ -1,18 +1,17 @@
 import express from 'express';
-import { createQuizController } from '../controllers/quiz.controller.js';
 import {
+  createQuizController,
   getAllQuizzes,
   getQuizById,
   deleteQuiz
-} from '../services/quiz.service.js';
+} from '../controllers/quiz.controller.js';
 
 const router = express.Router();
 
+// All routes are now prefixed by /v1/quizzes in the main server
 router.post('/', createQuizController);
 router.get('/', getAllQuizzes);
 router.get('/:id', getQuizById);
 router.delete('/:id', deleteQuiz);
 
 export default router;
-
-

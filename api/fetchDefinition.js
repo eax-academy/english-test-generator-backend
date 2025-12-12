@@ -1,6 +1,3 @@
-// ===============================
-// Fetch Best Definition + POS
-// ===============================
 export async function fetchDefinitionAndPos(word) {
   if (!word || typeof word !== "string" || !word.trim()) return null;
 

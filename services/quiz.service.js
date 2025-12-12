@@ -1,4 +1,6 @@
 import Quiz from "../models/quiz.model.js";
+import Word from "../models/word.model.js";
+
 import { handleTextSubmission } from "./analyze.service.js";
 import { translateToArmenian } from "../api/translateToArmenian.js";
 import { fetchDefinitionAndPos } from "../api/fetchDefinition.js";
@@ -166,7 +168,7 @@ export async function generateQuiz(keywords, text, type = "mixed", total = 10) {
   while (questions.length < total) {
     const word = pickRandom(validWords);
     const meta = cache.get(word);
-    if (!meta) continue; 
+    if (!meta) continue;
 
     const t = pickRandom(types);
     let q = null;
@@ -204,14 +206,28 @@ export async function createQuizService({ title, text, type = "mixed", difficult
 
   const questions = await generateQuiz(keywords, text, type, 10);
 
+  // Ensure each question has a wordId
+  const wordDocs = await Promise.all(
+    keywords.map(async (k) => {
+      let word = await Word.findOne({ word: k });
+      if (!word) word = await Word.create({ word: k });
+      
+      return word;
+    })
+  );
+
+  const questionsWithWordId = questions.map((q, i) => ({
+    ...q,
+    wordId: wordDocs[i % wordDocs.length]._id
+  }));
+
   const quiz = await Quiz.create({
     title,
-    text,
+    textSubmissionId: submission.submissionId,
     type,
     difficulty,
     keywords,
-    questions,
-    submissionId: submission.submissionId,
+    questions: questionsWithWordId,
     createdBy: userId,
   });
 
@@ -219,32 +235,3 @@ export async function createQuizService({ title, text, type = "mixed", difficult
 }
 
 
-// -------------------- CRUD --------------------
-export async function getAllQuizzes(req, res) {
-  try {
-    const quizzes = await Quiz.find().sort({ createdAt: -1 });
-    res.json(quizzes);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-}
-
-export async function getQuizById(req, res) {
-  try {
-    const quiz = await Quiz.findById(req.params.id);
-    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
-    res.json(quiz);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-}
-
-export async function deleteQuiz(req, res) {
-  try {
-    const quiz = await Quiz.findByIdAndDelete(req.params.id);
-    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
-    res.json({ message: "Quiz deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-}
