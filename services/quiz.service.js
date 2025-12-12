@@ -197,7 +197,13 @@ export async function generateQuiz(keywords, text, type = "mixed", total = 10) {
 
 
 // -------------------- Create Quiz API --------------------
-export async function createQuizService({ title, text, type = "mixed", difficulty = "basic", userId }) {
+export async function createQuizService({
+  title,
+  text,
+  type = "mixed",
+  difficulty = "basic",
+  userId
+}) {
   if (!title || !text) throw new Error("Title and text required");
 
   const submission = await handleTextSubmission(text, userId);
@@ -207,7 +213,7 @@ export async function createQuizService({ title, text, type = "mixed", difficult
 
   const questions = await generateQuiz(keywords, text, type, 10);
 
-  // Ensure each keyword has a Word document
+  // Ensure each keyword has its Word documents 
   const wordDocs = await Promise.all(
     keywords.map(async (k) => {
       let word = await Word.findOne({ word: k });
@@ -216,7 +222,7 @@ export async function createQuizService({ title, text, type = "mixed", difficult
     })
   );
 
-  // Create Questions as separate documents and get their IDs
+  // Create separate Question documents and get their IDs
   const questionIds = await Promise.all(
     questions.map(async (q, i) => {
       const questionDoc = await Question.create({
@@ -227,17 +233,20 @@ export async function createQuizService({ title, text, type = "mixed", difficult
     })
   );
 
-  // Create Quiz referencing the questions
+  // Build full embedded question objects with Word references
+  const fullQuestions = questions.map((q, i) => ({
+    ...q,
+    wordId: wordDocs[i % wordDocs.length]._id
+  }));
+
+  // Create quiz (with EMBEDDED questions, NOT references)
   const quiz = await Quiz.create({
     title,
     textSubmissionId: submission.submissionId,
     difficulty,
-    questions: questionIds,
+    questions: fullQuestions,
     createdBy: userId,
   });
 
   return { quiz, stats: submission.stats };
 }
-
-
-

@@ -1,4 +1,4 @@
-import { createQuizService} from "../services/quiz.service.js";
+import { createQuizService } from "../services/quiz.service.js";
 
 import Quiz from "../models/quiz.model.js";
 import TextSubmission from "../models/textSubmission.model.js";
