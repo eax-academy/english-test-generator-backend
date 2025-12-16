@@ -42,7 +42,7 @@ export async function getQuizById(req, res) {
   try {
     const quiz = await Quiz.findById(req.params.id).populate({
       path: "textSubmissionId",
-      select: "raw_text" // only get the raw_text field
+      select: "raw_text" 
     });
 
     if (!quiz) return res.status(404).json({ message: "Quiz not found" });
