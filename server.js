@@ -18,34 +18,48 @@ import usersRouter from "./routes/users.routes.js";
 import analyzeRouter from "./routes/analyze.routes.js";
 import loggerMiddleware from "./middleware/logger.middleware.js";
 
-import { config } from "./config/env.js"; 
+import { config } from "./config/env.js";
+
 
 const app = express();
 
-// Middleware
+// -------------------- Middlewares --------------------
 app.use(
   cors({
-    origin: "http://localhost:5173", // Your Frontend URL
-    credentials: true, // Allow cookies to be sent
+    origin: ["http://localhost:5173"], // Frontend URL(s)
+    credentials: true,                 // Allow cookies
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allowed HTTP methods
+    allowedHeaders: ["Content-Type", "Authorization"],   // Allowed headers
   })
 );
 
+// Global middlewares
 app.use(globalLimiter);
-
 app.use(morgan("dev"));
 app.use(express.json());
-
-// Database
-connectDB();
-
-// Routes
 app.use(loggerMiddleware);
-app.use("/api/v1", globalLimiter,authRoutes); // /api/v1/register, /api/v1/login
-app.use("/api/quiz", apiLimiter ,quizRoutes);
-app.use("/api/v1", adminRouter);
-app.use("/api/v1/tests", apiLimiter ,testsRouter);
+
+// -------------------- Routes --------------------
+// Quiz routes
+app.use("/api/v1/quiz", apiLimiter, quizRoutes);
+
+// Auth routes
+app.use("/api/v1/auth", authRoutes);
+
+// Admin routes
+app.use("/api/v1/admin", adminRouter);
+
+// Tests routes
+app.use("/api/v1/tests", apiLimiter, testsRouter);
+
+// Users routes
 app.use("/api/v1/users", apiLimiter, usersRouter);
-app.use("/api/v1/", apiLimiter , analyzeRouter);
+
+// Analyze routes
+app.use("/api/v1/analyze", apiLimiter, analyzeRouter);
+
+// 404 fallback
+app.use((req, res) => res.status(404).json({ message: "Endpoint not found" }));
 
 app.get("/", (req, res) =>
   res.json({ message: "🧠 English Test Generator Backend is running" })
@@ -57,23 +71,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Internal Server Error" });
 });
 
-// const startServer = async () => {
-//   try {
-//     await connectDB();
-//     await connectRedis();
-
 const PORT = config.port || 5000;
-const server = app.listen(PORT, () => console.log(`:white_tick: Server running on port ${PORT}`));
-//   } catch (error) {
-//     console.error("Failed to start server:", error);
-//     process.exit(1);
-//   }
-// };
+const server = app.listen(PORT, () => console.log(`🚀Server is running on port: ${PORT}`));
 
 await connectDB();
 await connectRedis();
-
-// startServer();
 
 const handleTermination = async (signal) => {
   console.log(`\n${signal} received. Initiating termination sequence...`);
