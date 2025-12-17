@@ -38,10 +38,10 @@ export const register = async (req, res) => {
   try {
     // 1. Validate Input
     const data = RegisterSchema.parse(req.body);
-    
+
     // 2. Call Service
     await authService.registerUser(data);
-    
+
     // 3. Send Response (We don't auto-login here, forcing them to login confirms flow)
     res.status(201).json({ message: 'User registered successfully' });
   } catch (error) {
@@ -52,24 +52,55 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = LoginSchema.parse(req.body);
-    
+
     // Service returns tokens and user
     const { accessToken, refreshToken, user } = await authService.loginUser({ email, password });
-    
+
     // SET COOKIES
     // Access Token: 15 minutes
-    res.cookie('accessToken', accessToken, { 
-      ...COOKIE_OPTIONS, 
-      maxAge: 15 * 60 * 1000 
+    res.cookie('accessToken', accessToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 15 * 60 * 1000
     });
 
     // Refresh Token: 7 days
-    res.cookie('refreshToken', refreshToken, { 
-      ...COOKIE_OPTIONS, 
-      maxAge: 7 * 24 * 60 * 60 * 1000 
+    res.cookie('refreshToken', refreshToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
+    // ... (existing login logic)
     res.json({ message: 'Login successful', user });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const adminLogin = async (req, res) => {
+  try {
+    const { email, password } = LoginSchema.parse(req.body);
+
+    // Service returns tokens and user
+    const { accessToken, refreshToken, user } = await authService.loginUser({ email, password });
+
+    if (user.role !== 'admin') {
+      return res.status(403).json({ error: "Access denied. Admins only." });
+    }
+
+    // SET COOKIES
+    // Access Token: 15 minutes
+    res.cookie('accessToken', accessToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 15 * 60 * 1000
+    });
+
+    // Refresh Token: 7 days
+    res.cookie('refreshToken', refreshToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
+    res.json({ message: 'Admin Login successful', user });
   } catch (error) {
     handleError(res, error);
   }
@@ -79,19 +110,19 @@ export const refresh = async (req, res) => {
   try {
     // Get refresh token from Cookie
     const token = req.cookies.refreshToken;
-    
+
     // Service rotates tokens
     const { accessToken, refreshToken } = await authService.refreshUserToken(token);
 
     // Send NEW Cookies
-    res.cookie('accessToken', accessToken, { 
-      ...COOKIE_OPTIONS, 
-      maxAge: 15 * 60 * 1000 
+    res.cookie('accessToken', accessToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 15 * 60 * 1000
     });
-    
-    res.cookie('refreshToken', refreshToken, { 
-      ...COOKIE_OPTIONS, 
-      maxAge: 7 * 24 * 60 * 60 * 1000 
+
+    res.cookie('refreshToken', refreshToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
     res.json({ message: 'Tokens refreshed' });
@@ -109,7 +140,7 @@ export const logout = async (req, res) => {
     if (userId) {
       await authService.logoutUser(userId);
     }
-    
+
     // Always clear cookies
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
@@ -134,7 +165,7 @@ export const resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
     const { password } = ResetPassSchema.parse(req.body);
-    
+
     await authService.resetUserPassword(token, password);
     res.json({ message: 'Password reset successful. Please login.' });
   } catch (error) {
@@ -152,7 +183,7 @@ const handleError = (res, error) => {
   if (error.message === 'User already exists') return res.status(409).json({ error: error.message });
   if (error.message === 'Invalid credentials') return res.status(401).json({ error: error.message });
   if (error.message === 'Access denied' || error.message === 'Reuse detected') return res.status(403).json({ error: 'Forbidden' });
-  
+
   // Default
   console.error(error);
   res.status(500).json({ error: 'Internal Server Error' });
