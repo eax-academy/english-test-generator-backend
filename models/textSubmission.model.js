@@ -2,7 +2,17 @@ import mongoose from "mongoose";
 
 const MAX_TEXT_LENGTH = 2000; // Adjusted for ~300 words (approx 6 chars per word + buffer)
 const MAX_KEYWORD_COUNT = 20;
-const MAX_WORD_LENGTH = 50;
+
+
+const NormalizedWordSchema = new mongoose.Schema({
+  word: { type: String, required: true },       // Original text (e.g. "Running")
+  lemma: { type: String, required: true },      // Root form (e.g. "run")
+  word_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Word' }, 
+  count: { type: Number, default: 1 },          // LOCAL usage count (in this text)
+  significanceScore: { type: Number, default: 0 },
+  isSignificant: { type: Boolean, default: false }
+}, { _id: false });
+
 const textSubmissionSchema = new mongoose.Schema(
   {
     user_id: {
@@ -21,18 +31,11 @@ const textSubmissionSchema = new mongoose.Schema(
         `Text cannot exceed ${MAX_TEXT_LENGTH} characters (approx 300 words)`,
       ],
     },
-    normalized_words: [
-      {
-        type: [String],
-        default: [],
-        validate: {
-          validator: function (array) {
-            return array.every((w) => w.length <= MAX_WORD_LENGTH);
-          },
-          message: `A word exceeds ${MAX_WORD_LENGTH} characters`,
-        },
-      },
-    ],
+    normalized_words: {
+      type: [NormalizedWordSchema], 
+      default: [],
+    },
+
     top_keywords: {
       type: [String],
       default: [],

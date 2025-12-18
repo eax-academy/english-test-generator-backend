@@ -29,6 +29,12 @@ const WordSchema = new mongoose.Schema(
       maxlength: [50, "Word cannot exceed 50 characters"],
       match: [/^[a-zA-Z\s-]+$/, 'Word contains invalid characters']
     },
+    lemma: {
+      type: String,
+      required: true,
+      index: true,
+      lowercase: true
+    },
     definition: {
       type: String,
       required: false,
@@ -51,9 +57,7 @@ const WordSchema = new mongoose.Schema(
       required: false,
       lowercase: true
     },
-    usage_count: { 
-      type: Number, 
-      default: 0 }, //global frequency
+ 
     level: {
       type: String,
       enum: {

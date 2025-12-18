@@ -19,22 +19,18 @@ import usersRouter from "./routes/users.routes.js";
 import analyzeRouter from "./routes/analyze.routes.js";
 import loggerMiddleware from "./middleware/logger.middleware.js";
 
-import { config } from "./config/env.js";
-
+import { config } from "./config/env.js"; 
 
 const app = express();
 
-// -------------------- Middlewares --------------------
+// Middleware
 app.use(
   cors({
-    origin: ["http://localhost:5173"], // Frontend URL(s)
-    credentials: true,                 // Allow cookies
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allowed HTTP methods
-    allowedHeaders: ["Content-Type", "Authorization"],   // Allowed headers
+    origin: "http://localhost:5173", // Your Frontend URL
+    credentials: true, // Allow cookies to be sent
   })
 );
 
-// Global middlewares
 app.use(globalLimiter);
 app.use(morgan("dev"));
 app.use(express.json());
@@ -42,42 +38,47 @@ app.use(cookieParser());
 app.use(loggerMiddleware);
 
 // -------------------- Routes --------------------
-// Quiz routes
-app.use("/api/v1/quiz", apiLimiter, quizRoutes);
 
-// Auth routes
-app.use("/api/v1/auth", authRoutes);
-
-// Admin routes
-app.use("/api/v1/admin", adminRouter);
-
-// Tests routes
-app.use("/api/v1/tests", apiLimiter, testsRouter);
-
-// Users routes
-app.use("/api/v1/users", apiLimiter, usersRouter);
-
-// Analyze routes
-app.use("/api/v1/analyze", apiLimiter, analyzeRouter);
-
-// 404 fallback
-app.use((req, res) => res.status(404).json({ message: "Endpoint not found" }));
-
+// Root Route
 app.get("/", (req, res) =>
   res.json({ message: "🧠 English Test Generator Backend is running" })
 );
 
-// Error Handling
+// API Routes
+app.use("/api/v1/quiz", apiLimiter, quizRoutes);
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/admin", adminRouter);
+app.use("/api/v1/tests", apiLimiter, testsRouter);
+app.use("/api/v1/users", apiLimiter, usersRouter);
+app.use("/api/v1/analyze", apiLimiter, analyzeRouter);
+
+// 404 Fallback
+app.use((req, res) => res.status(404).json({ message: "Endpoint not found" }));
+
+// Global Error Handling
 app.use((err, req, res, next) => {
   console.error("❌", err.message);
   res.status(500).json({ message: "Internal Server Error" });
 });
 
-const PORT = config.port || 5000;
-const server = app.listen(PORT, () => console.log(`🚀Server is running on port: ${PORT}`));
+// -------------------- Start Server --------------------
+const startServer = async () => {
+  try {
+    await connectDB();
+    await connectRedis();
 
-await connectDB();
-await connectRedis();
+    server = app.listen(PORT, () => {
+      console.log(`🚀 Server is running on port: ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+};
+
+startServer();
+
+// -------------------- Shutdown --------------------
 
 const handleTermination = async (signal) => {
   console.log(`\n${signal} received. Initiating termination sequence...`);
@@ -88,20 +89,23 @@ const handleTermination = async (signal) => {
   }, 10000).unref();
 
   try {
-    // Stop accepting new requests
-    server.close(async () => {
-      console.log("🔒 HTTP server closed");
-
-      try {
-        await disconnectDB();
-        await disconnectRedis();
-        console.log("Database disconnected");
-        process.exit(0); // Clean exit
-      } catch (err) {
-        console.error("Error during database disconnect:", err);
-        process.exit(1);
-      }
-    });
+    if (server) {
+      // Stop accepting new requests
+      server.close(async () => {
+        console.log("🔒 HTTP server closed");
+        try {
+          await disconnectDB();
+          await disconnectRedis();
+          console.log("Database disconnected");
+          process.exit(0);
+        } catch (err) {
+          console.error("Error during database disconnect:", err);
+          process.exit(1);
+        }
+      });
+    } else {
+      process.exit(0);
+    }
   } catch (err) {
     console.error("Error during server closure:", err);
     process.exit(1);
@@ -109,10 +113,9 @@ const handleTermination = async (signal) => {
 };
 
 // Listen for termination signals
-process.on("SIGTERM", () => handleTermination("SIGTERM")); // For Cloud/Docker stops
-process.on("SIGINT", () => handleTermination("SIGINT")); // For Ctrl + C in terminal
+process.on("SIGTERM", () => handleTermination("SIGTERM"));
+process.on("SIGINT", () => handleTermination("SIGINT"));
 
-// Optional: Handle unexpected crashes
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
   handleTermination("UNCAUGHT_EXCEPTION");
