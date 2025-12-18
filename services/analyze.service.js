@@ -4,7 +4,7 @@
  * Responsibilities:
  * 1. NLP Analysis: Cleaning text, extracting, and counting significant words.
  * 2. Database Synchronization: Efficiently syncing words with the MongoDB dictionary.
- * 3. Data Aggregation: Calculating "Significance Scores".
+ * 3. Data Aggregation: Calculating "Significance Scores" (Frequency + Difficulty + Global Relevance).
  * 4. Submission Handling: Saving user text history.
  */
 
@@ -32,88 +32,36 @@ const JUNK_TAGS = new Set([
 
 const TOP_KEYWORDS_LIMIT = 20;
 
-// Load dictionary into memory once (O(1) access)
 const englishWords = new Set(words.map((w) => w.toLowerCase()));
-
 
 // --- Validation Helpers ---
 
-/**
- * Validates the raw input text from the user.
- */
 const isValidInput = (text) => {
   return text && typeof text === "string" && text.trim().length > 0;
 };
 
-/**
- * Checks basic word structure (length).
- */
-const isValidWordStructure = (word) => {
-  return (
-    word &&
-    word.length >= CONFIG.MIN_WORD_LENGTH &&
-    word.length <= CONFIG.MAX_WORD_LENGTH
-  );
-};
-
-/**
- * Checks if the word actually exists in the English dictionary.
- */
-const isValidEnglishWord = (word) => {
-  if (!word) return false;
-  return englishWords.has(word.toLowerCase());
-};
-
-/**
- * NLP Check: Keep Nouns/Verbs, discard Prepositions/Junk.
- */
-const hasValidTags = (tags = []) => {
-  const isTarget = tags.some((tag) => TARGET_TAGS.has(tag));
-  const isJunk = tags.some((tag) => JUNK_TAGS.has(tag));
-  return isTarget && !isJunk;
-};
-
-
-// --- Text Processing Helpers ---
-
-/**
- * Normalizes text (removes weird spacing, handles merged periods).
- */
-const cleanInputText = (text) => {
-  return text
-    .replace(/([a-zA-Z])\.([a-zA-Z])/g, "$1 $2") // "end.Start" -> "end Start"
-    .replace(/[\n\t\r]/g, " ")
-    .replace(/\s+/g, " ") // Collapse multiple spaces
-    .trim();
-};
-
-/**
- * Extracts the root/normal form of a word using Compromise NLP.
- */
 const getNormalizedRoot = (term) => {
   const rawRoot = term.root || term.normal || term.text;
   if (!rawRoot) return null;
   return rawRoot.replace(/[^a-zA-Z-]/g, "").toLowerCase();
 };
 
-/**
- * Formats the frequency map into a sorted array.
- */
-const formatOutput = (frequencyMap) => {
-  return Object.keys(frequencyMap)
-    .map((word) => ({ word, count: frequencyMap[word] }))
-    .sort((a, b) => b.count - a.count);
+const cleanInputText = (text) => {
+  return text
+    .replace(/([a-zA-Z])\.([a-zA-Z])/g, "$1 $2")
+    .replace(/[\n\t\r]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 };
 
-
-// --- Core Analysis Helpers ---
+// --- SCORING HELPERS (The Core Logic) ---
 
 /**
- * Determines weight based on CEFR level.
+ * Определяет вес на основе уровня CEFR.
  */
 function getLevelWeight(level) {
   const weights = {
-    Unknown: 5.0,
+    Unknown: 3.0,
     C2: 4.0, C1: 3.0,
     B2: 2.0, B1: 1.5,
     A2: 0.5, A1: 0.1,
@@ -122,59 +70,31 @@ function getLevelWeight(level) {
 }
 
 /**
- * Merges local text frequency with Global DB data to calculate scores.
+ * "Золотая середина".
+ * Использует глобальную статистику (usage_count), чтобы найти самые полезные слова.
  */
-function generateWordAnalysis(frequencyData, dbWords) {
-  const dbWordsMap = new Map(dbWords.map((w) => [w.word, w]));
+function getRelevanceMultiplier(globalCount) {
+  // 1. Слишком редкие или новые (защита от опечаток и мусора)
+  if (!globalCount || globalCount < 5) {
+    return 0.8; 
+  }
 
-  return frequencyData.map((freqItem) => {
-    const dbInfo = dbWordsMap.get(freqItem.word);
-    const level = dbInfo?.level || "Unknown";
+  // 2. "ЗОЛОТАЯ ЗОНА" (Тематические слова)
+  // Они встречаются достаточно часто, чтобы быть реальными, 
+  // но не так часто, чтобы быть "водой".
+  if (globalCount >= 5 && globalCount <= 500) {
+    return 2.0; // Буст х2
+  }
 
-    // Formula: Frequency * Complexity
-    const score = freqItem.count * getLevelWeight(level);
+  // 3. Обычные слова
+  if (globalCount > 500 && globalCount <= 2000) {
+    return 1.0; 
+  }
 
-    return {
-      word: freqItem.word,
-      local_count: freqItem.count,
-      global_count: dbInfo?.usage_count || 0,
-      level: level,
-      definition: dbInfo?.definition || "",
-      translation: dbInfo?.translation || "",
-      id: dbInfo?._id,
-      significanceScore: score,
-    };
-  });
+  // 4. "Заезженные" слова (Слова-паразиты, даже если они nouns/verbs)
+  // Пример: "make", "time", "way"
+  return 0.3; // Штраф
 }
-
-/**
- * Sorts by score and slices top N words.
- */
-function getSignificantWords(analysis, limit) {
-  return [...analysis]
-    .sort((a, b) => b.significanceScore - a.significanceScore)
-    .slice(0, limit);
-}
-
-/**
- * Formats the final API response.
- */
-function formatResponse(submission, uniqueWords, significantWords, fullAnalysis) {
-  return {
-    success: true,
-    data: {
-      submissionId: submission._id,
-      stats: {
-        totalUniqueWords: uniqueWords.length,
-        mostComplexWord: significantWords[0]?.word || null,
-      },
-      significantWords: significantWords,
-      // All words sorted by frequency in this specific text
-      allWords: [...fullAnalysis].sort((a, b) => b.local_count - a.local_count),
-    },
-  };
-}
-
 
 // --- MAIN EXPORTED FUNCTIONS ---
 
@@ -182,52 +102,62 @@ function formatResponse(submission, uniqueWords, significantWords, fullAnalysis)
  * 1. Extracts keywords from text using NLP.
  */
 export function extractKeywordsWithFrequency(text) {
-  // Here returning [] is correct because this function returns a list
   if (!isValidInput(text)) return [];
 
   const cleanText = cleanInputText(text);
   const doc = nlp(cleanText);
-
-  doc.compute("root");
+  doc.compute("root"); 
+  
   const sentences = doc.json();
-
   if (!sentences || sentences.length === 0) return [];
 
-  const frequencyMap = {};
+  const frequencyMap = new Map(); 
 
   for (const sentence of sentences) {
     for (const term of sentence.terms) {
       const root = getNormalizedRoot(term);
 
-      // Fast-fail checks
-      if (!isValidWordStructure(root)) continue;
-      if (!hasValidTags(term.tags)) continue;
-      if (!isValidEnglishWord(root)) continue;
+      if (!root || root.length < CONFIG.MIN_WORD_LENGTH || root.length > CONFIG.MAX_WORD_LENGTH) continue;
+      if (!englishWords.has(root)) continue;
 
-      frequencyMap[root] = (frequencyMap[root] || 0) + 1;
+      const isTarget = term.tags.some((tag) => TARGET_TAGS.has(tag));
+      const isJunk = term.tags.some((tag) => JUNK_TAGS.has(tag));
+      const isSignificant = isTarget && !isJunk;
+
+      if (frequencyMap.has(root)) {
+        const entry = frequencyMap.get(root);
+        entry.count++; 
+      } else {
+        frequencyMap.set(root, {
+          lemma: root,
+          original: term.text,
+          count: 1, 
+          isSignificant: isSignificant
+        });
+      }
     }
-  }
-
-  return formatOutput(frequencyMap);
+  } 
+  return Array.from(frequencyMap.values());
 }
 
 /**
  * 2. Syncs a list of words with the Database (Upsert).
  */
-export async function syncWordsWithDB(wordsList) {
-  if (!wordsList || wordsList.length === 0) return [];
+export async function syncWordsWithDB(analyzedItems) {
+  if (!analyzedItems || analyzedItems.length === 0) return [];
 
-  const operations = wordsList.map((word) => ({
+  const operations = analyzedItems.map((item) => ({
     updateOne: {
-      filter: { word: word },
+      filter: { word: item.lemma }, 
       update: {
         $setOnInsert: {
-          word: word,
+          word: item.lemma,
+          lemma: item.lemma,
           level: "Unknown",
           definition: "",
           translation: "",
         },
-        $inc: { usage_count: 1 }, // increment global usage
+        $inc: { usage_count: 1 }, 
       },
       upsert: true,
     },
@@ -237,7 +167,8 @@ export async function syncWordsWithDB(wordsList) {
     if (operations.length > 0) {
       await WordModel.bulkWrite(operations);
     }
-    return await WordModel.find({ word: { $in: wordsList } }).lean();
+    const lemmas = analyzedItems.map(i => i.lemma);
+    return await WordModel.find({ word: { $in: lemmas } }).lean();
   } catch (error) {
     console.error("DB Sync Error:", error);
     throw new Error("Database synchronization failed.");
@@ -248,39 +179,75 @@ export async function syncWordsWithDB(wordsList) {
  * 3. MAIN CONTROLLER: Handles the full submission flow.
  */
 export async function handleTextSubmission(text, userId) {
-  // Validate Input - Return Object (Not Array!)
-  if (!isValidInput(text)) {
-    return { success: false, error: "Invalid or empty text provided." };
-  }
+  if (!isValidInput(text)) return { success: false, error: "Invalid text." };
 
   try {
-    // Step 1: NLP Analysis
-    const frequencyData = extractKeywordsWithFrequency(text);
+    // 1. NLP Analysis (Local Counts)
+    const localAnalysis = extractKeywordsWithFrequency(text);
+    if (localAnalysis.length === 0) return { success: false, error: "No words found." };
 
-    if (frequencyData.length === 0) {
-      return { success: false, error: "No valid English words found in text." };
-    }
+    // 2. Sync DB (Global Counts) - This updates usage_count!
+    const dbWords = await syncWordsWithDB(localAnalysis);
+    const dbWordsMap = new Map(dbWords.map((w) => [w.lemma, w]));
 
-    const uniqueWords = frequencyData.map((item) => item.word);
+    // 3. Create Rich Objects with "Golden Mean" Scoring
+    const richWordObjects = localAnalysis.map((item) => {
+      const dbInfo = dbWordsMap.get(item.lemma);
+      
+      const level = dbInfo?.level || "Unknown";
+      const globalCount = dbInfo?.usage_count || 1;
 
-    // Step 2: Database Sync
-    const dbWords = await syncWordsWithDB(uniqueWords);
+      // --- SCORING FORMULA ---
+      const difficultyWeight = getLevelWeight(level);       // CEFR
+      const relevanceWeight = getRelevanceMultiplier(globalCount); // Golden Mean Logic
+      const localFreq = item.count;                         // How many times in THIS text
 
-    // Step 3: Analysis & Scoring
-    const fullAnalysis = generateWordAnalysis(frequencyData, dbWords);
-    const significantWords = getSignificantWords(fullAnalysis, TOP_KEYWORDS_LIMIT);
+      const score = (localFreq * difficultyWeight) * relevanceWeight;
 
-    // Step 4: Save History
+      return {
+        word: item.original,
+        lemma: item.lemma,
+        word_id: dbInfo?._id,
+        count: item.count,
+        significanceScore: parseFloat(score.toFixed(2)),
+        isSignificant: item.isSignificant
+      };
+    });
+
+    // 4. Create Simple Strings for `top_keywords` (Sort by Score)
+    const topKeywordsStrings = richWordObjects
+      .filter(w => w.isSignificant)
+      .sort((a, b) => b.significanceScore - a.significanceScore)
+      .slice(0, TOP_KEYWORDS_LIMIT)
+      .map(w => w.word); 
+
+    // 5. Save to MongoDB
     const newSubmission = await TextSubmissionModel.create({
       user_id: userId,
       raw_text: text,
-      normalized_words: uniqueWords,
-      top_keywords: significantWords.map((w) => w.word),
+      normalized_words: richWordObjects, 
+      top_keywords: topKeywordsStrings,
     });
 
-    
-    const response = formatResponse(newSubmission, uniqueWords, significantWords, fullAnalysis);
-    return response.data
+    // 6. Filter & Sort significant words for the API Response
+    const significantWords = richWordObjects
+      .filter(w => w.isSignificant && w.word_id) 
+      .sort((a, b) => b.significanceScore - a.significanceScore)
+      .slice(0, TOP_KEYWORDS_LIMIT);
+
+    return {
+      success: true,
+      data: {
+        submissionId: newSubmission._id,
+        stats: {
+          totalUniqueWords: richWordObjects.length,
+          significantWordCount: significantWords.length
+        },
+        significantWords: significantWords, 
+        allWords: richWordObjects // Optional: remove if payload is too big
+      },
+    };
+
   } catch (error) {
     console.error("Error in handleTextSubmission:", error);
     return { success: false, error: "Internal processing error." };

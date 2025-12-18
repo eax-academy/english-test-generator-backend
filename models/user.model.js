@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-const ALLOWED_ROLES = ["user", "teacher", "admin"]; //TODO: teacher?
+const ALLOWED_ROLES = ["user", "admin"]; 
 
 const userSchema = new mongoose.Schema(
   {
@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       minlength: [2, "Name must be at least 2 characters long"],
       maxlength: [50, "Name cannot exceed 50 characters"],
+      match: [/^[a-zA-Z-]+$/, "Name can only contain letters and hyphens"],
     },
     surname: {
       type: String,
@@ -16,6 +17,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       minlength: [2, "Surname must be at least 2 characters long"],
       maxlength: [50, "Surname cannot exceed 50 characters"],
+      match: [/^[a-zA-Z-]+$/, "Surname can only contain letters and hyphens"],
     },
     email: {
       type: String,
@@ -23,7 +25,10 @@ const userSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      match: [/^\S+@\S+\.\S+$/, "Invalid email format"],
+      match: [
+        /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+        "Please provide a valid email address",
+      ],
       index: true,
     },
     password: { type: String, required: true },
@@ -45,7 +50,7 @@ const userSchema = new mongoose.Schema(
     },
     resetPasswordToken: {
       type: String,
-      default: undefined, // Keeps DB clean
+      default: undefined, 
     },
     resetPasswordExpires: {
       type: Date,
@@ -53,7 +58,6 @@ const userSchema = new mongoose.Schema(
     },
   },
 
-  //TODO: toJSON?
   { 
     timestamps: true,
     toJSON: {
@@ -63,7 +67,7 @@ const userSchema = new mongoose.Schema(
         delete ret.refreshTokenHash;
         delete ret.resetPasswordToken;
         delete ret.resetPasswordExpires;
-        delete ret.__v; // Mongoose version key
+        delete ret.__v; 
         return ret;
       } 
     }
