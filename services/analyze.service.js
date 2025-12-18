@@ -55,10 +55,6 @@ const cleanInputText = (text) => {
 };
 
 // --- SCORING HELPERS (The Core Logic) ---
-
-/**
- * Определяет вес на основе уровня CEFR.
- */
 function getLevelWeight(level) {
   const weights = {
     Unknown: 3.0,
@@ -69,35 +65,21 @@ function getLevelWeight(level) {
   return weights[level] || 1;
 }
 
-/**
- * "Золотая середина".
- * Использует глобальную статистику (usage_count), чтобы найти самые полезные слова.
- */
 function getRelevanceMultiplier(globalCount) {
-  // 1. Слишком редкие или новые (защита от опечаток и мусора)
   if (!globalCount || globalCount < 5) {
     return 0.8; 
   }
-
-  // 2. "ЗОЛОТАЯ ЗОНА" (Тематические слова)
-  // Они встречаются достаточно часто, чтобы быть реальными, 
-  // но не так часто, чтобы быть "водой".
   if (globalCount >= 5 && globalCount <= 500) {
     return 2.0; // Буст х2
   }
 
-  // 3. Обычные слова
   if (globalCount > 500 && globalCount <= 2000) {
     return 1.0; 
   }
-
-  // 4. "Заезженные" слова (Слова-паразиты, даже если они nouns/verbs)
-  // Пример: "make", "time", "way"
-  return 0.3; // Штраф
+  return 0.3; 
 }
 
 // --- MAIN EXPORTED FUNCTIONS ---
-
 /**
  * 1. Extracts keywords from text using NLP.
  */
