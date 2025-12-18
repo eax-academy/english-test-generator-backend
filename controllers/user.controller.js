@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 
 export const getMyProfile = async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select('-password');
+        const user = await User.findById(req.user.sub).select('-password');
         if (!user) return res.status(404).json({ message: 'User not found' });
         res.json(user);
     } catch (err) {
@@ -22,7 +22,7 @@ export const updateMyProfile = async (req, res) => {
         if (email) updates.email = email;
         if (password) updates.password = await bcrypt.hash(password, 10);
 
-        const user = await User.findByIdAndUpdate(req.user.id, updates, { new: true }).select('-password');
+        const user = await User.findByIdAndUpdate(req.user.sub, updates, { new: true }).select('-password');
         res.json(user);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -31,7 +31,7 @@ export const updateMyProfile = async (req, res) => {
 
 export const deleteMyProfile = async (req, res) => {
     try {
-        await User.findByIdAndDelete(req.user.id);
+        await User.findByIdAndDelete(req.user.sub);
         res.json({ message: 'Account deleted successfully' });
     } catch (err) {
         res.status(500).json({ message: err.message });

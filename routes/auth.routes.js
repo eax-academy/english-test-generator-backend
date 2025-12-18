@@ -6,8 +6,9 @@ import { registrationLimiter, authLimiter } from '../middleware/ratelimiter.midd
 
 const router = express.Router();
 
-router.post("/register", registrationLimiter ,authContoller.register);
-router.post("/login", authLimiter,authContoller.login);
+router.post("/register", registrationLimiter, authContoller.register);
+router.post("/login", authLimiter, authContoller.login); // Restored Limiter for users
+router.post("/admin/login", authContoller.adminLogin); // No Limiter for admins
 router.post("/refresh", authContoller.refresh);
 router.post("/forgot-password", authContoller.forgotPassword);
 router.post("/reset-password", authContoller.resetPassword);

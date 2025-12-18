@@ -1,4 +1,37 @@
 import Test from '../models/test.model.js';
+import User from '../models/user.model.js';
+import Quiz from '../models/quiz.model.js';
+import Result from '../models/result.model.js';
+
+export const getDashboardStats = async (req, res) => {
+    try {
+        const totalUsers = await User.countDocuments();
+        const totalQuizzes = await Quiz.countDocuments();
+        const totalTests = await Test.countDocuments();
+        const totalResults = await Result.countDocuments();
+
+        res.json({
+            users: totalUsers,
+            quizzes: totalQuizzes,
+            tests: totalTests,
+            results: totalResults
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+export const getAllResults = async (req, res) => {
+    try {
+        const results = await Result.find()
+            .populate('userId', 'name email')
+            .populate('quizId', 'title')
+            .sort({ completedAt: -1 });
+        res.json(results);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
 
 export const getAllTests = async (req, res) => {
     try {

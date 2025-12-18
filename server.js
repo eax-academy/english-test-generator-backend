@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 dotenv.config();
 import morgan from "morgan";
+import cookieParser from "cookie-parser";
 import { connectDB, disconnectDB } from "./config/db.js";
 import { connectRedis, disconnectRedis } from "./config/redis.js";
 import {
@@ -37,6 +38,7 @@ app.use(
 app.use(globalLimiter);
 app.use(morgan("dev"));
 app.use(express.json());
+app.use(cookieParser());
 app.use(loggerMiddleware);
 
 // -------------------- Routes --------------------
