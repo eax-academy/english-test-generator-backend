@@ -16,18 +16,21 @@ import quizRoutes from "./routes/quiz.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import testsRouter from "./routes/tests.routes.js";
 import usersRouter from "./routes/users.routes.js";
+//TODO: analyze route change isAdmin
 import analyzeRouter from "./routes/analyze.routes.js";
 import loggerMiddleware from "./middleware/logger.middleware.js";
 
-import { config } from "./config/env.js"; 
-
+import { config } from "./config/env.js";
 const app = express();
+const PORT = config.port || 5000;
+let server;
 
 // Middleware
 app.use(
   cors({
     origin: "http://localhost:5173", // Your Frontend URL
     credentials: true, // Allow cookies to be sent
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
