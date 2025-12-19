@@ -48,11 +48,12 @@ app.get("/", (req, res) =>
 );
 
 // API Routes
-app.use("/api/v1/quiz", apiLimiter, quizRoutes);
+app.use("/api/v1/quiz", quizRoutes); //apiLimiter, quizRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/tests", apiLimiter, testsRouter);
 app.use("/api/v1/users", apiLimiter, usersRouter);
+//TODO: ONLY ADMIN analyze route
 app.use("/api/v1/analyze", apiLimiter, analyzeRouter);
 
 // 404 Fallback
