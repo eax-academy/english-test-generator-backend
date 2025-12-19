@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+dotenv.config();
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import { connectDB, disconnectDB } from "./config/db.js";
@@ -15,22 +16,21 @@ import quizRoutes from "./routes/quiz.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import testsRouter from "./routes/tests.routes.js";
 import usersRouter from "./routes/users.routes.js";
+//TODO: analyze route change isAdmin
 import analyzeRouter from "./routes/analyze.routes.js";
 import loggerMiddleware from "./middleware/logger.middleware.js";
-import wordRoutes from "./routes/word.routes.js";
+
 import { config } from "./config/env.js";
-dotenv.config();
-
 const app = express();
-
+const PORT = config.port || 5000;
 let server;
-const PORT = config.port || process.env.port || 5000;
 
 // Middleware
 app.use(
   cors({
-    origin: "http://localhost:5173",
-    credentials: true,
+    origin: "http://localhost:5173", // Your Frontend URL
+    credentials: true, // Allow cookies to be sent
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -54,7 +54,6 @@ app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/tests", apiLimiter, testsRouter);
 app.use("/api/v1/users", apiLimiter, usersRouter);
 app.use("/api/v1/analyze", apiLimiter, analyzeRouter);
-app.use("/api/v1/words", wordRoutes);
 
 // 404 Fallback
 app.use((req, res) => res.status(404).json({ message: "Endpoint not found" }));
