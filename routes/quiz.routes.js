@@ -5,7 +5,7 @@ import {
   getQuizById,
   deleteQuiz
 } from '../controllers/quiz.controller.js';
-
+//TODO: ADD UPDATE QUIZ
 const router = express.Router();
 
 // All routes are now prefixed by /v1/quizzes in the main server

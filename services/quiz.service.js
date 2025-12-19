@@ -5,7 +5,7 @@ import Word from "../models/word.model.js";
 import { handleTextSubmission } from "./analyze.service.js";
 import { translateToArmenian } from "../api/translateToArmenian.js";
 import { fetchDefinitionAndPos } from "../api/fetchDefinition.js";
-
+//TODO: ADD UPDATE QUIZ
 
 // -------------------- Quiz Utilities --------------------
 function escapeRegExp(s = "") {
@@ -14,15 +14,14 @@ function escapeRegExp(s = "") {
 
 function shuffleArray(arr = []) {
   return arr
-    .map(x => ({ val: x, r: Math.random() }))
+    .map((x) => ({ val: x, r: Math.random() }))
     .sort((a, b) => a.r - b.r)
-    .map(o => o.val);
+    .map((o) => o.val);
 }
 
 function pickRandom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
-
 
 // -------------------- Sentence & Distractors --------------------
 function replaceWordWithBlank(sentence, word) {
@@ -38,7 +37,6 @@ function generateRandomSentence(word, pos) {
   return `Here is the word: ${word}.`;
 }
 
-
 // ---------------------- Question Makers --------------------
 async function makeFillQuestion(word, pool = [], cache, text) {
   const meta = cache.get(word) || {};
@@ -46,26 +44,32 @@ async function makeFillQuestion(word, pool = [], cache, text) {
 
   const sentences = text
     .split(/(?<=[.!?])\s+/)
-    .filter(s => new RegExp(`\\b${escapeRegExp(word)}\\b`, "i").test(s));
+    .filter((s) => new RegExp(`\\b${escapeRegExp(word)}\\b`, "i").test(s));
 
-  const chosen = sentences.length ? pickRandom(sentences) : generateRandomSentence(word, pos);
+  const chosen = sentences.length
+    ? pickRandom(sentences)
+    : generateRandomSentence(word, pos);
   const question = replaceWordWithBlank(chosen, word);
 
   let distractors = shuffleArray(
-    pool.filter(k =>
-      k.toLowerCase() !== word.toLowerCase() &&
-      (cache.get(k)?.pos || "") === pos &&
-      k !== meta.translation &&
-      k && typeof k === "string"
+    pool.filter(
+      (k) =>
+        k.toLowerCase() !== word.toLowerCase() &&
+        (cache.get(k)?.pos || "") === pos &&
+        k !== meta.translation &&
+        k &&
+        typeof k === "string"
     )
   ).slice(0, 3);
 
   if (distractors.length < 3) {
     const more = shuffleArray(
-      pool.filter(k =>
-        k.toLowerCase() !== word.toLowerCase() &&
-        !distractors.includes(k) &&
-        k && typeof k === "string"
+      pool.filter(
+        (k) =>
+          k.toLowerCase() !== word.toLowerCase() &&
+          !distractors.includes(k) &&
+          k &&
+          typeof k === "string"
       )
     ).slice(0, 3 - distractors.length);
     distractors = [...distractors, ...more];
@@ -86,10 +90,10 @@ async function makeDefinitionQuestion(word, meta, keywords, cache) {
   if (!correct) return null;
   let distractors = shuffleArray(
     keywords
-      .filter(k => k !== word)
-      .map(k => cache.get(k)?.definition)
+      .filter((k) => k !== word)
+      .map((k) => cache.get(k)?.definition)
       .filter(Boolean)
-      .filter(d => d !== correct)
+      .filter((d) => d !== correct)
   ).slice(0, 3);
 
   distractors = [...new Set(distractors)].filter(Boolean).slice(0, 3);
@@ -107,10 +111,10 @@ function makeTranslationQuestion(word, meta, keywords, cache) {
   if (!correct) return null;
   let distractors = shuffleArray(
     keywords
-      .filter(k => k !== word)
-      .map(k => cache.get(k)?.translation)
+      .filter((k) => k !== word)
+      .map((k) => cache.get(k)?.translation)
       .filter(Boolean)
-      .filter(t => t !== correct)
+      .filter((t) => t !== correct)
   ).slice(0, 3);
 
   distractors = [...new Set(distractors)].filter(Boolean).slice(0, 3);
@@ -122,7 +126,6 @@ function makeTranslationQuestion(word, meta, keywords, cache) {
     options: shuffleArray([correct, ...distractors]),
   };
 }
-
 
 // -------------------- Word Data Cache --------------------
 const wordCache = new Map();
@@ -160,11 +163,12 @@ export async function generateQuiz(keywords, text, type = "mixed", total = 10) {
   const cache = await buildWordCache(uniq);
 
   // Only use words that have valid cache entries
-  const validWords = uniq.filter(w => cache.has(w));
+  const validWords = uniq.filter((w) => cache.has(w));
   if (!validWords.length) return [];
 
   const questions = [];
-  const types = type === "mixed" ? ["fill", "definition", "translation"] : [type];
+  const types =
+    type === "mixed" ? ["fill", "definition", "translation"] : [type];
 
   while (questions.length < total) {
     const word = pickRandom(validWords);
@@ -175,8 +179,10 @@ export async function generateQuiz(keywords, text, type = "mixed", total = 10) {
     let q = null;
 
     if (t === "fill") q = await makeFillQuestion(word, validWords, cache, text);
-    if (t === "definition") q = await makeDefinitionQuestion(word, meta, validWords, cache);
-    if (t === "translation") q = makeTranslationQuestion(word, meta, validWords, cache);
+    if (t === "definition")
+      q = await makeDefinitionQuestion(word, meta, validWords, cache);
+    if (t === "translation")
+      q = makeTranslationQuestion(word, meta, validWords, cache);
 
     if (
       q &&
@@ -184,7 +190,7 @@ export async function generateQuiz(keywords, text, type = "mixed", total = 10) {
       q.options &&
       Array.isArray(q.options) &&
       q.options.length >= 2 &&
-      !questions.some(existing => existing.question === q.question)
+      !questions.some((existing) => existing.question === q.question)
     ) {
       questions.push(q);
     }
@@ -195,54 +201,71 @@ export async function generateQuiz(keywords, text, type = "mixed", total = 10) {
   return questions.slice(0, total);
 }
 
-
 // -------------------- Create Quiz API --------------------
 export async function createQuizService({
   title,
   text,
   type = "mixed",
   difficulty = "basic",
-  userId
+  userId,
 }) {
   if (!title || !text) throw new Error("Title and text required");
 
   const submission = await handleTextSubmission(text, userId);
-  const keywords = submission.significantWords.map(w => w.word);
+  if (!submission.success) {
+    throw new Error("Failed to analyze text for quiz: " + submission.error);
+  }
+  const significantWordsData = submission.data.significantWords;
+  if (!significantWordsData || !Array.isArray(significantWordsData)) {
+    throw new Error("No significant words found in analysis");
+  }
 
-  if (keywords.length < 5) throw new Error("Not enough keywords to generate quiz");
+  const keywords = significantWordsData.map((w) => w.word);
+
+  if (keywords.length < 5)
+    throw new Error("Not enough keywords to generate quiz");
 
   const questions = await generateQuiz(keywords, text, type, 10);
-
-  // Ensure each keyword has its Word documents 
   const wordDocs = await Promise.all(
     keywords.map(async (k) => {
-      let word = await Word.findOne({ word: k });
-      if (!word) word = await Word.create({ word: k });
-      return word;
+      let wordDoc = await Word.findOne({ word: k });
+      if (!wordDoc) {
+        const analysisInfo = significantWordsData.find((sw) => sw.word === k);
+        wordDoc = await Word.create({
+          word: k,
+          lemma: analysisInfo?.lemma || k, // required
+          level: "Unknown", 
+        });
+      }
+      return wordDoc;
     })
   );
-
+ 
   // Create separate Question documents and get their IDs
   const questionIds = await Promise.all(
     questions.map(async (q, i) => {
       const questionDoc = await Question.create({
         ...q,
-        wordId: wordDocs[i % wordDocs.length]._id
+        wordId: wordDocs[i % wordDocs.length]._id,
       });
       return questionDoc._id;
     })
   );
+  const wordMap = new Map(wordDocs.map((d) => [d.word, d._id]));
 
-  // Build full embedded question objects with Word references
-  const fullQuestions = questions.map((q, i) => ({
-    ...q,
-    wordId: wordDocs[i % wordDocs.length]._id
-  }));
 
-  // Create quiz (with EMBEDDED questions, NOT references)
+  const fullQuestions = questions.map((q) => {
+    const wordId = wordMap.get(q.answer) || wordDocs[0]._id;
+
+    return {
+      ...q,
+      wordId: wordId,
+    };
+  });
+
   const quiz = await Quiz.create({
     title,
-    textSubmissionId: submission.submissionId,
+    textSubmissionId: submission.data.submissionId,
     difficulty,
     questions: fullQuestions,
     createdBy: userId,
