@@ -4,12 +4,16 @@ import dotenv from "dotenv";
 dotenv.config();
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+
 import { connectDB, disconnectDB } from "./config/db.js";
 import { connectRedis, disconnectRedis } from "./config/redis.js";
 import {
   globalLimiter,
   apiLimiter,
 } from "./middleware/ratelimiter.middleware.js";
+
+import { startWordWorker, stopWordWorker } from "./queues/startWorker.js";
+import { scheduleDatabaseCheck, closeQueue } from "./queues/scheduler.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import quizRoutes from "./routes/quiz.routes.js";
@@ -70,7 +74,17 @@ const startServer = async () => {
   try {
     await connectDB();
     await connectRedis();
+    // 1. Start the worker (it will wait for jobs to appear in Redis)
+    startWordWorker();
 
+    // 2. Start the scheduler immediately to find words needing updates
+    scheduleDatabaseCheck();
+
+    // 3. (Optional) Set an interval to run the check every 1 hour
+    setInterval(() => {
+      scheduleDatabaseCheck();
+    }, 1000 * 60 * 60); 
+    
     server = app.listen(PORT, () => {
       console.log(`🚀 Server is running on port: ${PORT}`);
     });
