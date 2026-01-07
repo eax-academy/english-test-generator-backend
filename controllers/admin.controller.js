@@ -41,3 +41,34 @@ export const getAllTests = async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 };
+
+export const saveResult = async (req, res) => {
+  try {
+    const {
+      quizId,
+      score,
+      elapsedTime,
+      totalQuestions,
+      userId,
+    } = req.body;
+
+    if (!quizId || score === undefined || !userId) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const result = await Result.create({
+      quizId,
+      score,
+      elapsedTime,
+      totalQuestions,
+      userId, 
+      completedAt: new Date(),
+    });
+
+    res.status(201).json(result);
+  } catch (err) {
+    console.error("Create result error:", err);
+    res.status(500).json({ message: "Failed to save result" });
+  }
+};
+

@@ -65,7 +65,7 @@ const WordSchema = new mongoose.Schema(
         message: "{VALUE} is not a valid CEFR level",
       },
       default: "Unknown",
-      uppercase: true
+      // uppercase: true
     },
     usage_count: {
       type: Number,

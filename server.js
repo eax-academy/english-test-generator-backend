@@ -37,10 +37,9 @@ app.use(
 app.use(globalLimiter);
 app.use(morgan("dev"));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(loggerMiddleware);
-
-// -------------------- Routes --------------------
 
 // Root Route
 app.get("/", (req, res) =>
@@ -65,7 +64,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Internal Server Error" });
 });
 
-// -------------------- Start Server --------------------
+// Start server
 const startServer = async () => {
   try {
     await connectDB();
@@ -82,8 +81,7 @@ const startServer = async () => {
 
 startServer();
 
-// -------------------- Shutdown --------------------
-
+// Shut down server
 const handleTermination = async (signal) => {
   console.log(`\n${signal} received. Initiating termination sequence...`);
 

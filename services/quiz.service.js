@@ -206,23 +206,50 @@ export async function createQuizService({
 }) {
   if (!title || !text) throw new Error("Title and text required");
 
+  // 1️⃣ Handle text submission
   const submission = await handleTextSubmission(text, userId);
-  const keywords = submission.significantWords.map(w => w.word);
+  const data = submission?.data;
+  if (!data || !Array.isArray(data.significantWords) || data.significantWords.length < 5) {
+    throw new Error("Not enough keywords to generate quiz");
+  }
 
+  const keywords = data.significantWords.map(w => w.word);
   if (keywords.length < 5) throw new Error("Not enough keywords to generate quiz");
 
+  // 2️⃣ Generate quiz questions
   const questions = await generateQuiz(keywords, text, type, 10);
+  if (!questions.length) throw new Error("Failed to generate quiz questions");
 
-  // Ensure each keyword has its Word documents 
+  // 3️⃣ Helper: normalize CEFR levels
+  const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2", "Unknown"];
+  function normalizeLevel(level) {
+    if (!level) return "Unknown";
+
+    const formatted = level[0].toUpperCase() + level.slice(1).toLowerCase();
+    return CEFR_LEVELS.includes(formatted) ? formatted : "Unknown";
+  }
+
+  // 4️⃣ Ensure each keyword has its Word document
   const wordDocs = await Promise.all(
     keywords.map(async (k) => {
       let word = await Word.findOne({ word: k });
-      if (!word) word = await Word.create({ word: k });
+
+      if (!word) {
+        const meta = wordCache.get(k) || {};
+        word = await Word.create({
+          word: k,
+          lemma: meta.lemma || k.toLowerCase(),
+          level: normalizeLevel(meta.level),
+          partOfSpeech: meta.pos || "noun",
+          translation: meta.translation || null,
+          definition: meta.definition || null,
+        });
+      }
       return word;
     })
   );
 
-  // Create separate Question documents and get their IDs
+  // 5️⃣ Create separate Question documents
   const questionIds = await Promise.all(
     questions.map(async (q, i) => {
       const questionDoc = await Question.create({
@@ -233,20 +260,21 @@ export async function createQuizService({
     })
   );
 
-  // Build full embedded question objects with Word references
+  // 6️⃣ Build full embedded question objects with Word references
   const fullQuestions = questions.map((q, i) => ({
     ...q,
     wordId: wordDocs[i % wordDocs.length]._id
   }));
 
-  // Create quiz (with EMBEDDED questions, NOT references)
+  // 7️⃣ Create the quiz
   const quiz = await Quiz.create({
     title,
-    textSubmissionId: submission.submissionId,
+    textSubmissionId: data.submissionId,
     difficulty,
     questions: fullQuestions,
     createdBy: userId,
   });
 
-  return { quiz, stats: submission.stats };
+  return { quiz, stats: data.stats };
 }
+
