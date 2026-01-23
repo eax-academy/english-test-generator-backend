@@ -8,8 +8,6 @@ import { getDashboardStats, getAllTests, getAllResults, saveResult } from '../co
 import { getAllUsers, deleteUserById, updateUserById } from '../controllers/user.controller.js';
 import { getAllQuizzes, deleteQuiz } from '../controllers/quiz.controller.js';
 
-import Result from '../models/result.model.js';
-
 const router = express.Router();
 
 router.use('/logs', adminLog);

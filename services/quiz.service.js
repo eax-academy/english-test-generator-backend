@@ -6,275 +6,178 @@ import { handleTextSubmission } from "./analyze.service.js";
 import { translateToArmenian } from "../api/translateToArmenian.js";
 import { fetchDefinitionAndPos } from "../api/fetchDefinition.js";
 
-
-// -------------------- Quiz Utilities --------------------
-function escapeRegExp(s = "") {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function shuffleArray(arr = []) {
-  return arr
-    .map(x => ({ val: x, r: Math.random() }))
-    .sort((a, b) => a.r - b.r)
-    .map(o => o.val);
-}
-
-function pickRandom(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-
-// -------------------- Sentence & Distractors --------------------
-function replaceWordWithBlank(sentence, word) {
-  const regex = new RegExp(`\\b${escapeRegExp(word)}\\b`, "gi");
-  return sentence.replace(regex, "_____");
-}
+// -------------------- Utilities --------------------
+const escapeRegExp = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const shuffleArray = (arr = []) => [...arr].sort(() => Math.random() - 0.5);
+const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 function generateRandomSentence(word, pos) {
-  if (pos === "verb") return `I usually ${word} the bag.`;
-  if (pos === "noun") return `This ${word} is very important.`;
-  if (pos === "adjective") return `It was a really ${word} moment.`;
-  if (pos === "adverb") return `He finished the task ${word}.`;
-  return `Here is the word: ${word}.`;
-}
-
-
-// ---------------------- Question Makers --------------------
-async function makeFillQuestion(word, pool = [], cache, text) {
-  const meta = cache.get(word) || {};
-  const pos = meta.pos || "noun";
-
-  const sentences = text
-    .split(/(?<=[.!?])\s+/)
-    .filter(s => new RegExp(`\\b${escapeRegExp(word)}\\b`, "i").test(s));
-
-  const chosen = sentences.length ? pickRandom(sentences) : generateRandomSentence(word, pos);
-  const question = replaceWordWithBlank(chosen, word);
-
-  let distractors = shuffleArray(
-    pool.filter(k =>
-      k.toLowerCase() !== word.toLowerCase() &&
-      (cache.get(k)?.pos || "") === pos &&
-      k !== meta.translation &&
-      k && typeof k === "string"
-    )
-  ).slice(0, 3);
-
-  if (distractors.length < 3) {
-    const more = shuffleArray(
-      pool.filter(k =>
-        k.toLowerCase() !== word.toLowerCase() &&
-        !distractors.includes(k) &&
-        k && typeof k === "string"
-      )
-    ).slice(0, 3 - distractors.length);
-    distractors = [...distractors, ...more];
-  }
-
-  distractors = [...new Set(distractors)].filter(Boolean).slice(0, 3);
-
-  return {
-    type: "fill",
-    question,
-    answer: word,
-    options: shuffleArray([word, ...distractors]),
+  const templates = {
+    verb: `I usually ${word} the bag.`,
+    noun: `This ${word} is very important.`,
+    adjective: `It was a really ${word} moment.`,
+    adverb: `He finished the task ${word}.`,
   };
+  return templates[pos] || `Here is the word: ${word}.`;
 }
 
-async function makeDefinitionQuestion(word, meta, keywords, cache) {
-  const correct = meta?.definition || null;
-  if (!correct) return null;
-  let distractors = shuffleArray(
-    keywords
-      .filter(k => k !== word)
-      .map(k => cache.get(k)?.definition)
-      .filter(Boolean)
-      .filter(d => d !== correct)
-  ).slice(0, 3);
-
-  distractors = [...new Set(distractors)].filter(Boolean).slice(0, 3);
-
-  return {
-    type: "definition",
-    question: `What is the meaning of "${word}"?`,
-    answer: correct,
-    options: shuffleArray([correct, ...distractors]),
-  };
-}
-
-function makeTranslationQuestion(word, meta, keywords, cache) {
-  const correct = meta?.translation || null;
-  if (!correct) return null;
-  let distractors = shuffleArray(
-    keywords
-      .filter(k => k !== word)
-      .map(k => cache.get(k)?.translation)
-      .filter(Boolean)
-      .filter(t => t !== correct)
-  ).slice(0, 3);
-
-  distractors = [...new Set(distractors)].filter(Boolean).slice(0, 3);
-
-  return {
-    type: "translation",
-    question: `Translate "${word}" to Armenian:`,
-    answer: correct,
-    options: shuffleArray([correct, ...distractors]),
-  };
-}
-
-
-// -------------------- Word Data Cache --------------------
-const wordCache = new Map();
-
-async function getValidDefinition(word) {
-  const def = await fetchDefinitionAndPos(word);
-  if (!def) return null; // skip this word if no definition
-  return { word, ...def };
-}
-
-async function buildWordCache(keys = []) {
-  for (const k of keys) {
-    if (!wordCache.has(k)) {
-      const [translation, defData] = await Promise.all([
-        translateToArmenian(k),
-        getValidDefinition(k),
-      ]);
-
-      if (defData) {
-        wordCache.set(k, {
-          translation: translation || null,
-          definition: defData.definition,
-          pos: defData.pos || "noun",
-          example: defData.example || null,
-        });
+// -------------------- Data Fetching --------------------
+async function buildWordCache(keys) {
+  const cache = new Map();
+  await Promise.all(
+    keys.map(async (word) => {
+      try {
+        const [translation, defData] = await Promise.all([
+          translateToArmenian(word),
+          fetchDefinitionAndPos(word),
+        ]);
+        if (defData) {
+          cache.set(word.toLowerCase(), {
+            word: word.toLowerCase(),
+            translation: translation || null,
+            definition: defData.definition,
+            pos: defData.pos || "noun",
+            level: defData.level || "Unknown",
+          });
+        }
+      } catch (err) {
+        console.error(`Error fetching data for ${word}:`, err);
       }
-    }
-  }
-  return wordCache;
+    })
+  );
+  return cache;
 }
 
-// -------------------- Quiz Generator --------------------
-export async function generateQuiz(keywords, text, type = "mixed", total = 10) {
-  const uniq = [...new Set(keywords)].filter(Boolean);
-  const cache = await buildWordCache(uniq);
+// -------------------- Question Generation --------------------
+function getDistractors(correctValue, pool, cache, field, originalWord) {
+  const distractors = pool
+    .filter((w) => w !== originalWord)
+    .map((w) => (field === "word" ? w : cache.get(w.toLowerCase())?.[field]))
+    .filter((val) => val && val !== correctValue);
+  return shuffleArray([...new Set(distractors)]).slice(0, 3);
+}
 
-  // Only use words that have valid cache entries
-  const validWords = uniq.filter(w => cache.has(w));
+export async function generateQuestions(keywords, text, type, total, cache) {
+  const validWords = keywords.filter((w) => cache.has(w.toLowerCase()));
   if (!validWords.length) return [];
 
+  const sentences = text.split(/(?<=[.!?])\s+/);
   const questions = [];
   const types = type === "mixed" ? ["fill", "definition", "translation"] : [type];
 
-  while (questions.length < total) {
-    const word = pickRandom(validWords);
-    const meta = cache.get(word);
-    if (!meta) continue;
-
-    const t = pickRandom(types);
+  let attempts = 0;
+  while (questions.length < total && attempts < total * 3) {
+    const word = validWords[attempts % validWords.length];
+    const meta = cache.get(word.toLowerCase());
+    const selectedType = pickRandom(types);
     let q = null;
 
-    if (t === "fill") q = await makeFillQuestion(word, validWords, cache, text);
-    if (t === "definition") q = await makeDefinitionQuestion(word, meta, validWords, cache);
-    if (t === "translation") q = makeTranslationQuestion(word, meta, validWords, cache);
-
-    if (
-      q &&
-      q.question &&
-      q.options &&
-      Array.isArray(q.options) &&
-      q.options.length >= 2 &&
-      !questions.some(existing => existing.question === q.question)
-    ) {
-      questions.push(q);
+    if (selectedType === "fill") {
+      const regex = new RegExp(`\\b${escapeRegExp(word)}\\b`, "i");
+      const chosen = pickRandom(sentences.filter((s) => regex.test(s))) || generateRandomSentence(word, meta.pos);
+      q = {
+        type: "fill",
+        question: chosen.replace(regex, "_____"),
+        answer: word,
+        options: shuffleArray([word, ...getDistractors(word, validWords, cache, "word", word)]),
+        wordKey: word.toLowerCase(),
+      };
+    } else if (selectedType === "definition" && meta.definition) {
+      q = {
+        type: "definition",
+        question: `What is the meaning of "${word}"?`,
+        answer: meta.definition,
+        options: shuffleArray([meta.definition, ...getDistractors(meta.definition, validWords, cache, "definition", word)]),
+        wordKey: word.toLowerCase(),
+      };
+    } else if (selectedType === "translation" && meta.translation) {
+      q = {
+        type: "translation",
+        question: `Translate "${word}" to Armenian:`,
+        answer: meta.translation,
+        options: shuffleArray([meta.translation, ...getDistractors(meta.translation, validWords, cache, "translation", word)]),
+        wordKey: word.toLowerCase(),
+      };
     }
 
-    if (questions.length + validWords.length < total) break;
+    if (q && !questions.some((prev) => prev.question === q.question)) {
+      questions.push(q);
+    }
+    attempts++;
   }
-
-  return questions.slice(0, total);
+  return questions;
 }
 
-
-// -------------------- Create Quiz API --------------------
-export async function createQuizService({
-  title,
-  text,
-  type = "mixed",
-  difficulty = "basic",
-  userId
-}) {
+// -------------------- Main Service --------------------
+export async function createQuizService({ title, text, type = "mixed", difficulty = "basic", userId }) {
   if (!title || !text) throw new Error("Title and text required");
 
-  // 1️⃣ Handle text submission
   const submission = await handleTextSubmission(text, userId);
-  const data = submission?.data;
-  if (!data || !Array.isArray(data.significantWords) || data.significantWords.length < 5) {
-    throw new Error("Not enough keywords to generate quiz");
+  const sigWords = submission?.data?.significantWords;
+  if (!sigWords || sigWords.length < 5) throw new Error("Not enough keywords found");
+
+  // FIX 1: Normalize all keywords to lowercase and trim to prevent "Province" vs "province" issues
+  const keywords = [...new Set(sigWords.map((w) => w.word.toLowerCase().trim()))];
+
+  const cache = await buildWordCache(keywords);
+  const validKeywords = keywords.filter((k) => cache.has(k));
+
+  // FIX 2: Find existing words using normalized keys
+  const existingWords = await Word.find({ word: { $in: validKeywords } });
+  const wordMap = new Map(existingWords.map((w) => [w.word.toLowerCase(), w]));
+
+  const wordsToCreate = validKeywords
+    .filter((k) => !wordMap.has(k))
+    .map((k) => ({
+      word: k,
+      lemma: k,
+      level: cache.get(k).level,
+      partOfSpeech: cache.get(k).pos,
+      translation: cache.get(k).translation,
+      definition: cache.get(k).definition,
+    }));
+
+  if (wordsToCreate.length > 0) {
+    try {
+      // FIX 3: Use ordered: false so if one word fails (duplicate), others still succeed
+      const createdWords = await Word.insertMany(wordsToCreate, { ordered: false });
+      createdWords.forEach((w) => wordMap.set(w.word.toLowerCase(), w));
+    } catch (err) {
+      // If error is code 11000 (duplicate), we can ignore it and fetch the ones that were just created by the other process
+      if (err.code !== 11000) throw err;
+      const refetched = await Word.find({ word: { $in: wordsToCreate.map(w => w.word) } });
+      refetched.forEach((w) => wordMap.set(w.word.toLowerCase(), w));
+    }
   }
 
-  const keywords = data.significantWords.map(w => w.word);
-  if (keywords.length < 5) throw new Error("Not enough keywords to generate quiz");
+  const questionBlueprints = await generateQuestions(validKeywords, text, type, 10, cache);
 
-  // 2️⃣ Generate quiz questions
-  const questions = await generateQuiz(keywords, text, type, 10);
-  if (!questions.length) throw new Error("Failed to generate quiz questions");
+  // FIX 4: Ensure every question blueprint actually found a word in the wordMap
+  const validBlueprints = questionBlueprints.filter(q => wordMap.has(q.wordKey));
 
-  // 3️⃣ Helper: normalize CEFR levels
-  const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2", "Unknown"];
-  function normalizeLevel(level) {
-    if (!level) return "Unknown";
-
-    const formatted = level[0].toUpperCase() + level.slice(1).toLowerCase();
-    return CEFR_LEVELS.includes(formatted) ? formatted : "Unknown";
-  }
-
-  // 4️⃣ Ensure each keyword has its Word document
-  const wordDocs = await Promise.all(
-    keywords.map(async (k) => {
-      let word = await Word.findOne({ word: k });
-
-      if (!word) {
-        const meta = wordCache.get(k) || {};
-        word = await Word.create({
-          word: k,
-          lemma: meta.lemma || k.toLowerCase(),
-          level: normalizeLevel(meta.level),
-          partOfSpeech: meta.pos || "noun",
-          translation: meta.translation || null,
-          definition: meta.definition || null,
-        });
-      }
-      return word;
-    })
+  const questionDocs = await Question.insertMany(
+    validBlueprints.map((q) => ({
+      type: q.type,
+      question: q.question,
+      answer: q.answer,
+      options: q.options,
+      wordId: wordMap.get(q.wordKey)._id,
+    }))
   );
 
-  // 5️⃣ Create separate Question documents
-  const questionIds = await Promise.all(
-    questions.map(async (q, i) => {
-      const questionDoc = await Question.create({
-        ...q,
-        wordId: wordDocs[i % wordDocs.length]._id
-      });
-      return questionDoc._id;
-    })
-  );
-
-  // 6️⃣ Build full embedded question objects with Word references
-  const fullQuestions = questions.map((q, i) => ({
-    ...q,
-    wordId: wordDocs[i % wordDocs.length]._id
-  }));
-
-  // 7️⃣ Create the quiz
   const quiz = await Quiz.create({
     title,
-    textSubmissionId: data.submissionId,
+    textSubmissionId: submission.data.submissionId,
     difficulty,
-    questions: fullQuestions,
+    questions: questionDocs.map((q) => ({
+      type: q.type,
+      question: q.question,
+      answer: q.answer,
+      options: q.options,
+      wordId: q.wordId,
+    })),
     createdBy: userId,
   });
 
-  return { quiz, stats: data.stats };
+  return { quiz, stats: submission.data.stats };
 }
-

@@ -4,7 +4,6 @@ import { config } from "./env.js";
 export const connectDB = async () => {
   try {
     const conn = await mongoose.connect(config.mongoUri);
-    // console.log(`PORT : ${config.port}`);
     console.log(`✅ MongoDB connected: ${conn.connection.host}:27017/${conn.connection.name}`);
   } catch (error) {
     console.error(`Error: ${error.message}`);
