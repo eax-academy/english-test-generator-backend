@@ -3,6 +3,6 @@ import { analyzeTextController } from '../controllers/analyze.controller.js';
 
 const router = express.Router();
 
-router.post('/analyze', analyzeTextController);
+router.post('/', analyzeTextController);
 
 export default router;

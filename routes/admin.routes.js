@@ -1,36 +1,33 @@
-import express from 'express';
-import adminLog from '../routes/admin.logs.js';
-import adminWords from '../routes/admin.words.js';
+import express from "express";
+import { verifyToken, isAdmin } from "../middleware/auth.middleware.js";
 
-import { verifyToken, isAdmin } from '../middleware/auth.middleware.js';
+import adminLog from "../routes/admin.logs.js";
+import adminWords from "./admin.words.routes.js";
+import adminSubmissions from "./admin.submissions.routes.js";
+import adminQuizzes from "./admin.quizzes.routes.js";
+import adminUsers from "./admin.users.routes.js";
 
-import { getDashboardStats, getAllTests, getAllResults, saveResult } from '../controllers/admin.controller.js';
-import { getAllUsers, deleteUserById, updateUserById } from '../controllers/user.controller.js';
-import { getAllQuizzes, deleteQuiz } from '../controllers/quiz.controller.js';
+import {
+  getDashboardStats,
+  getAllTests,
+  getAllResults,
+} from "../controllers/admin.controller.js";
 
 const router = express.Router();
 
-router.use('/logs', adminLog);
-router.use('/words', adminWords);
+//router.use(verifyToken, isAdmin);
+
+router.use("/logs", adminLog);
+router.use("/words", adminWords);
+router.use("/submissions", adminSubmissions);
+router.use("/quizzes", adminQuizzes);
+router.use("/users", adminUsers);
 
 // Dashboard
-router.get('/dashboard', verifyToken, isAdmin, getDashboardStats);
-
-// Users
-// router.get('/users', verifyToken, isAdmin, getAllUsers);
-router.get('/users', getAllUsers);
-router.delete('/users/:id', verifyToken, isAdmin, deleteUserById);
-router.put('/users/:id', verifyToken, isAdmin, updateUserById);
-
-// Quizzes
-router.get('/quizzes', verifyToken, isAdmin, getAllQuizzes);
-router.delete('/quizzes/:id', verifyToken, isAdmin, deleteQuiz);
+router.get("/dashboard", getDashboardStats);
 
 // Results (Tests & Attempts)
-router.get('/tests', verifyToken, isAdmin, getAllTests);
-// router.get('/results', verifyToken, isAdmin, getAllResults);
-// router.post('/results', verifyToken, saveResult);
-router.get('/results', getAllResults);
-router.post('/results', saveResult);
+router.get("/results", getAllResults);
+router.get("/tests", getAllTests);
 
 export default router;

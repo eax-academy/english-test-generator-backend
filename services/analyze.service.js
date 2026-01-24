@@ -13,6 +13,8 @@ import words from "an-array-of-english-words" with { type: 'json' };
 import WordModel from "../models/word.model.js";
 import TextSubmissionModel from "../models/textSubmission.model.js";
 
+import { wordQueue } from "../queues/scheduler.js"; 
+
 // --- Constants & Configuration ---
 
 const CONFIG = {
@@ -70,7 +72,7 @@ function getRelevanceMultiplier(globalCount) {
     return 0.8; 
   }
   if (globalCount >= 5 && globalCount <= 500) {
-    return 2.0; // Буст х2
+    return 2.0; 
   }
 
   if (globalCount > 500 && globalCount <= 2000) {
@@ -78,6 +80,37 @@ function getRelevanceMultiplier(globalCount) {
   }
   return 0.3; 
 }
+
+// ---Helper to add words to the queue
+async function triggerBackgroundUpdate(dbWords) {
+  try {
+    const wordsToQueue = dbWords.filter(w => {
+      const needsUpdate = w.level === "Unknown" || !w.translation || w.translation === "";
+      const isMeaningful = w.word.length > 2; 
+      
+      return needsUpdate && isMeaningful;
+    });
+
+    if (wordsToQueue.length === 0) return;
+
+    // Build jobs for BullMQ
+    const jobs = wordsToQueue.map(word => ({
+      name: 'update-single-word',
+      data: { wordId: word._id, wordText: word.word },
+      opts: { 
+        jobId: `update-${word._id}`, // Deduplication
+        removeOnComplete: true,      
+        removeOnFailed: { age: 3600 } 
+      }
+    }));
+
+    await wordQueue.addBulk(jobs);
+    
+  } catch (error) {
+    console.error("❌ Error while adding jobs to the queue (triggerBackgroundUpdate):", error.message);
+  } 
+} 
+
 
 // --- MAIN EXPORTED FUNCTIONS ---
 /**
@@ -170,6 +203,9 @@ export async function handleTextSubmission(text, userId) {
 
     // 2. Sync DB (Global Counts) - This updates usage_count!
     const dbWords = await syncWordsWithDB(localAnalysis);
+    //---TRIGGER FOR BACKGROUND JOB ---
+    triggerBackgroundUpdate(dbWords).catch(err => console.error("Background Queue Error:", err));
+
     const dbWordsMap = new Map(dbWords.map((w) => [w.lemma, w]));
 
     // 3. Create Rich Objects with "Golden Mean" Scoring

@@ -14,7 +14,7 @@ const PARTS_OF_SPEECH = [
   "other",
 ];
 
-const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2", "Unknown"];
+const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2", "Unknown", "UNKNOWN"];
 
 const WordSchema = new mongoose.Schema(
   {
@@ -24,23 +24,22 @@ const WordSchema = new mongoose.Schema(
       unique: true,
       index: true,
       trim: true,
-      lowercase: true, 
+      lowercase: true,
       minlength: [1, "Word must be at least 1 character long"],
       maxlength: [50, "Word cannot exceed 50 characters"],
-      match: [/^[a-zA-Z\s-]+$/, 'Word contains invalid characters']
+      match: [/^[a-zA-Z\s-]+$/, "Word contains invalid characters"],
     },
     lemma: {
       type: String,
       required: true,
       index: true,
-      lowercase: true
+      lowercase: true,
     },
     definition: {
       type: String,
       required: false,
       trim: true,
       maxlength: [500, "Definition cannot exceed 1000 characters"],
-      
     },
     translation: {
       type: String,
@@ -52,12 +51,12 @@ const WordSchema = new mongoose.Schema(
       type: String,
       enum: {
         values: PARTS_OF_SPEECH,
-        message: "{VALUE} is not a valid part of speech"
+        message: "{VALUE} is not a valid part of speech",
       },
       required: false,
-      lowercase: true
+      lowercase: true,
     },
- 
+
     level: {
       type: String,
       enum: {
@@ -65,7 +64,7 @@ const WordSchema = new mongoose.Schema(
         message: "{VALUE} is not a valid CEFR level",
       },
       default: "Unknown",
-      // uppercase: true
+      uppercase: true,
     },
     usage_count: {
       type: Number,
@@ -80,7 +79,7 @@ const WordSchema = new mongoose.Schema(
   {
     timestamps: true,
     toJSON: { virtuals: true },
-    toObject: { virtuals: true }
+    toObject: { virtuals: true },
   }
 );
 

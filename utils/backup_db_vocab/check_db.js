@@ -1,6 +1,5 @@
 import sqlite3 from "sqlite3";
 
-// CHANGE THIS TO YOUR EXACT FILE NAME
 const DB_PATH = "./words_collection_copy.db";
 
 const db = new sqlite3.Database(DB_PATH, sqlite3.OPEN_READONLY);

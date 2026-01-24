@@ -1,8 +1,10 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+dotenv.config();
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+
 import { connectDB, disconnectDB } from "./config/db.js";
 import { connectRedis, disconnectRedis } from "./config/redis.js";
 import {
@@ -10,27 +12,29 @@ import {
   apiLimiter,
 } from "./middleware/ratelimiter.middleware.js";
 
+import { startWordWorker, stopWordWorker } from "./queues/startWorker.js";
+import { scheduleDatabaseCheck, closeQueue } from "./queues/scheduler.js";
+
 import authRoutes from "./routes/auth.routes.js";
 import quizRoutes from "./routes/quiz.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import testsRouter from "./routes/tests.routes.js";
 import usersRouter from "./routes/users.routes.js";
+//TODO: analyze route change isAdmin
 import analyzeRouter from "./routes/analyze.routes.js";
 import loggerMiddleware from "./middleware/logger.middleware.js";
-import wordRoutes from "./routes/word.routes.js";
+
 import { config } from "./config/env.js";
-dotenv.config();
-
 const app = express();
-
+const PORT = config.port || 5000;
 let server;
-const PORT = config.port || process.env.port || 5000;
 
 // Middleware
 app.use(
   cors({
-    origin: "http://localhost:5173",
-    credentials: true,
+    origin: "http://localhost:5173", // Your Frontend URL
+    credentials: true, // Allow cookies to be sent
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -47,13 +51,13 @@ app.get("/", (req, res) =>
 );
 
 // API Routes
-app.use("/api/v1/quiz", apiLimiter, quizRoutes);
+app.use("/api/v1/quiz", quizRoutes); //apiLimiter, quizRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/tests", apiLimiter, testsRouter);
 app.use("/api/v1/users", apiLimiter, usersRouter);
+//TODO: ONLY ADMIN analyze route
 app.use("/api/v1/analyze", apiLimiter, analyzeRouter);
-app.use("/api/v1/words", wordRoutes);
 
 // 404 Fallback
 app.use((req, res) => res.status(404).json({ message: "Endpoint not found" }));
@@ -69,7 +73,17 @@ const startServer = async () => {
   try {
     await connectDB();
     await connectRedis();
+    // 1. Start the worker (it will wait for jobs to appear in Redis)
+    startWordWorker();
 
+    // 2. Start the scheduler immediately to find words needing updates
+    scheduleDatabaseCheck();
+
+    // 3. (Optional) Set an interval to run the check every 1 hour
+    setInterval(() => {
+      scheduleDatabaseCheck();
+    }, 1000 * 60 * 60); 
+    
     server = app.listen(PORT, () => {
       console.log(`🚀 Server is running on port: ${PORT}`);
     });
