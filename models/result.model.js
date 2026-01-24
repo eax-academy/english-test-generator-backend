@@ -7,9 +7,11 @@ const ResultSchema = new mongoose.Schema({
     required: true,
   },
   userId: {
-    // type: mongoose.Schema.Types.ObjectId,
-    // ref: "User",
-    // required: true,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  email: {
     type: String,
     required: true,
   },

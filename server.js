@@ -82,8 +82,8 @@ const startServer = async () => {
     // 3. (Optional) Set an interval to run the check every 1 hour
     setInterval(() => {
       scheduleDatabaseCheck();
-    }, 1000 * 60 * 60); 
-    
+    }, 1000 * 60 * 60);
+
     server = app.listen(PORT, () => {
       console.log(`🚀 Server is running on port: ${PORT}`);
     });
