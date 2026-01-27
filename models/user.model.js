@@ -42,12 +42,6 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
     // --- AUTH SYSTEM REQUIREMENT ---
-    // Stores the HASH of the refresh token. 
-    // If the DB is hacked, they can't create access tokens.
-    refreshTokenHash: {
-      type: String,
-      default: null
-    },
     resetPasswordToken: {
       type: String,
       default: undefined, 
@@ -64,7 +58,6 @@ const userSchema = new mongoose.Schema(
       transform: function (doc, ret) {
         // These fields are internal/secure and should never go to the frontend
         delete ret.password;
-        delete ret.refreshTokenHash;
         delete ret.resetPasswordToken;
         delete ret.resetPasswordExpires;
         delete ret.__v; 
