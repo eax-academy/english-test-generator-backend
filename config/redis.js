@@ -85,9 +85,6 @@ try {
     }
 } catch (err) {
     console.error(":x: Redis Top-Level Connect Error:", err.message);
-    // Do not exit process here, let the app handle it or fail gracefully? 
-    // Actually, for a backend requring redis, crashing is often safer than indefinite hangs.
-    // But let's log it.
 }
 
 export default redisClient; 

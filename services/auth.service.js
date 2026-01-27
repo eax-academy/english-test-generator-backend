@@ -2,6 +2,7 @@ import User from "../models/user.model.js";
 import * as crypto from "../utils/crypto.js";
 import { sendEmail } from "../utils/email.js";
 import nodeCrypto from "node:crypto";
+import redisClient from "../config/redis.js";
 
 export async function registerUser({ name, surname, email, password }) {
   const existing = await User.findOne({ email });
@@ -40,19 +41,21 @@ export const refreshUserToken = async (incomingToken) => {
   const decoded = crypto.verifyRefreshToken(incomingToken);
   if (!decoded) throw new Error("Invalid token");
 
-  const user = await User.findById(decoded.sub);
-  if (!user || !user.refreshTokenHash) throw new Error("Access denied");
+  //Fetch hashed token from REDIS
+  const redisKey = `refresh_token:${decoded.sub}`;
+  const storedHash = await redisClient.get(redisKey);
+  // If not in Redis, user is logged out or session expired
+  if (!storedHash) throw new Error("Access denied");
 
-  // Check if token matches DB hash 
-  const isMatch = crypto.compareToken(incomingToken, user.refreshTokenHash);
+  const isMatch = crypto.compareToken(incomingToken, storedHash);
 
   if (!isMatch) {
-    // Theft detected! Revoke access.
-    console.error(`Reuse Detected for user ${user._id}`);
-    user.refreshTokenHash = null;
-    await user.save();
+    console.error(`Reuse Detected for user ${decoded.sub}`);
+    await redisClient.del(redisKey);
     throw new Error("Reuse detected");
   }
+  const user = await User.findById(decoded.sub);
+  if (!user) throw new Error("User not found");
   return generateTokensAndSave(user);
 };
 
@@ -65,7 +68,6 @@ export const requestPasswordReset = async (email) => {
   user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
   await user.save();
 
-  //environment variable
   const clientUrl = process.env.CLIENT_URL || "http://localhost:5002";
   const resetLink = `${clientUrl}/reset-password/${resetToken}`;
 
@@ -77,6 +79,7 @@ export const requestPasswordReset = async (email) => {
   );
   return true;
 };
+
 
 /**
  * Confirm Password Reset
@@ -97,7 +100,7 @@ export const resetUserPassword = async (token, newPassword) => {
 };
 
 export const logoutUser = async (userId) => {
-  await User.findByIdAndUpdate(userId, { refreshTokenHash: null });
+  await redisClient.del(`refresh_token:${userId}`);
 };
 
 
@@ -108,8 +111,11 @@ const generateTokensAndSave = async (user) => {
   // Generate JWTs
   const accessToken = crypto.signAccessToken(payload);
   const refreshToken = crypto.signRefreshToken({ sub: user._id });
-  user.refreshTokenHash = crypto.hashToken(refreshToken);
+  const hashedToken = crypto.hashToken(refreshToken);
+  const REDIS_TTL = 7 * 24 * 60 * 60; 
+  await redisClient.set(`refresh_token:${user._id}`, hashedToken, {
+    EX: REDIS_TTL,
+  });
 
-  await user.save();
   return { accessToken, refreshToken, user };
 };
