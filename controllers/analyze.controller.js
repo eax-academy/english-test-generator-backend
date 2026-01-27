@@ -1,23 +1,20 @@
 import { handleTextSubmission } from "../services/analyze.service.js";
-/**
- * Controller to handle the text analysis request.
- * Receives HTTP request -> Calls Service -> Sends HTTP response.
- */
+import { z } from 'zod';
+
+const AnalyzeSchema = z.object({
+  text: z.string()
+    .min(1, "Text input is required")
+    .trim(),
+});
+
 export const analyzeTextController = async (req, res) => {
   try {
-    const { text } = req.body;
-
-    // test ID, req.user (JWT middleware)
-    const userId = req.user?._id || "654321654321654321654321";
-
-    if (!text || typeof text !== "string" || !text.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Text input is required and must be a string.",
-      });
+    const { text } = AnalyzeSchema.parse(req.body);
+    const userId = req.user?.sub;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized: User ID missing" });
     }
-
-    console.log("Controller: Processing analysis...");
+    console.log(`Admin ${userId} is initiating analysis...`);
     const result = await handleTextSubmission(text, userId);
 
     return res.status(201).json({
@@ -26,9 +23,11 @@ export const analyzeTextController = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error("❌ Controller Error:", error);
-    return res.status(500).json({
-      success: false,
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message });
+    }
+    console.error("❌ Analyze Controller Error:", error);
+    return res.status(error.status || 500).json({
       error: error.message || "Internal Server Error",
     });
   }
