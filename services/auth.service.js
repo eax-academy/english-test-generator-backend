@@ -36,15 +36,14 @@ export async function loginUser({ email, password }) {
 export const refreshUserToken = async (incomingToken) => {
   if (!incomingToken) throw new Error("No token provided");
 
-  // 1. Verify JWT Signature
+  // Verify JWT Signature
   const decoded = crypto.verifyRefreshToken(incomingToken);
   if (!decoded) throw new Error("Invalid token");
 
-  // 2. Find User
   const user = await User.findById(decoded.sub);
   if (!user || !user.refreshTokenHash) throw new Error("Access denied");
 
-  // 3. Security: Check if token matches DB hash (SHA-256)
+  // Check if token matches DB hash 
   const isMatch = crypto.compareToken(incomingToken, user.refreshTokenHash);
 
   if (!isMatch) {
@@ -54,8 +53,6 @@ export const refreshUserToken = async (incomingToken) => {
     await user.save();
     throw new Error("Reuse detected");
   }
-
-  // 4. Rotate: Issue new tokens and SAVE User
   return generateTokensAndSave(user);
 };
 
@@ -100,26 +97,19 @@ export const resetUserPassword = async (token, newPassword) => {
 };
 
 export const logoutUser = async (userId) => {
-  // Clear the refresh hash to revoke access
   await User.findByIdAndUpdate(userId, { refreshTokenHash: null });
 };
 
-// ==========================================
-// INTERNAL HELPER (The "Saver")
-// ==========================================
+
+// INTERNAL HELPER 
 const generateTokensAndSave = async (user) => {
   const payload = { sub: user._id, role: user.role };
 
   // Generate JWTs
   const accessToken = crypto.signAccessToken(payload);
   const refreshToken = crypto.signRefreshToken({ sub: user._id });
-
-  // CRITICAL STEP: Hash the refresh token before saving
-  // We use SHA-256 (hashToken) because Bcrypt is too slow and has length limits
   user.refreshTokenHash = crypto.hashToken(refreshToken);
 
-  // THIS IS WHERE WE SAVE THE USER ON LOGIN
   await user.save();
-
   return { accessToken, refreshToken, user };
 };
