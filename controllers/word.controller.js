@@ -1,12 +1,11 @@
 import * as wordService from "../services/word.service.js";
 
-// READ ALL
 export const getWords = async (req, res) => {
   try {
     const { page, limit, search, level, partOfSpeech } = req.query;
 
     const result = await wordService.getAllWordsService(
-      { search, level, partOfSpeech }, // filters
+      { search, level, partOfSpeech }, 
       page,
       limit
     );
@@ -25,7 +24,6 @@ export const getWords = async (req, res) => {
   }
 };
 
-// READ ONE
 export const getWordById = async (req, res) => {
   try {
     const word = await wordService.getWordByIdService(req.params.id);
@@ -40,7 +38,6 @@ export const getWordById = async (req, res) => {
   }
 };
 
-// UPDATE
 export const updateWord = async (req, res) => {
   try {
     const updatedWord = await wordService.updateWordService(req.params.id, req.body);
@@ -55,13 +52,11 @@ export const updateWord = async (req, res) => {
       data: updatedWord,
     });
   } catch (error) {
-    // Basic error handling for duplicates or validation
     const status = error.name === 'ValidationError' ? 400 : 500;
     return res.status(status).json({ success: false, error: error.message });
   }
 };
 
-// DELETE
 export const deleteWord = async (req, res) => {
   try {
     const deleted = await wordService.deleteWordService(req.params.id);
