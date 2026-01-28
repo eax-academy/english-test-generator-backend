@@ -31,7 +31,11 @@ const userSchema = new mongoose.Schema(
       ],
       index: true,
     },
-    password: { type: String, required: true },
+    password: {
+      type: String, 
+      required: true,
+      select: false
+    },
     role: {
       type: String,
       enum: {
@@ -40,26 +44,25 @@ const userSchema = new mongoose.Schema(
       },
       default: "user",
       trim: true,
+
     },
     // --- AUTH SYSTEM REQUIREMENT ---
     resetPasswordToken: {
       type: String,
       default: undefined, 
+      select: false
     },
     resetPasswordExpires: {
       type: Date,
       default: undefined,
+      select: false
     },
   },
 
   { 
     timestamps: true,
     toJSON: {
-      transform: function (doc, ret) {
-        // These fields are internal/secure and should never go to the frontend
-        delete ret.password;
-        delete ret.resetPasswordToken;
-        delete ret.resetPasswordExpires;
+      transform: (doc, ret) => {
         delete ret.__v; 
         return ret;
       } 

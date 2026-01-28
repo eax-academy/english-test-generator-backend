@@ -26,30 +26,18 @@ const textSubmissionSchema = new mongoose.Schema(
       required: [true, "Text content is required"],
       trim: true,
       minlength: [10, "Text must be at least 10 characters long"],
-      maxlength: [
-        MAX_TEXT_LENGTH,
-        `Text cannot exceed ${MAX_TEXT_LENGTH} characters (approx 300 words)`,
-      ],
+      maxlength: [MAX_TEXT_LENGTH, `Text cannot exceed ${MAX_TEXT_LENGTH} chars`],
     },
-    normalized_words: {
-      type: [NormalizedWordSchema], 
-      default: [],
-    },
+    normalized_words: [NormalizedWordSchema], 
+    
 
     top_keywords: {
       type: [String],
       default: [],
-      validate: [
-        {
-          validator: function (val) {
-            return val.length <= MAX_KEYWORD_COUNT;
-          },
-          message: `Cannot store more than ${MAX_KEYWORD_COUNT} keywords`,
-        },
-      ],
+      validate: [val => val.length <= MAX_KEYWORD_COUNT, "{PATH} exceeds the limit of " + MAX_KEYWORD_COUNT],
     },
   },
-  { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
+  { timestamps: true }
 );
 
 const TextSubmission =

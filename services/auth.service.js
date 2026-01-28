@@ -22,7 +22,7 @@ export async function registerUser({ name, surname, email, password }) {
  * Login user and issue Access + Refresh Tokens
  */
 export async function loginUser({ email, password }) {
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email }).select("+password");;
   if (!user) throw new Error("User not found");
 
   const valid = await crypto.comparePassword(password, user.password);
@@ -37,14 +37,12 @@ export async function loginUser({ email, password }) {
 export const refreshUserToken = async (incomingToken) => {
   if (!incomingToken) throw new Error("No token provided");
 
-  // Verify JWT Signature
   const decoded = crypto.verifyRefreshToken(incomingToken);
   if (!decoded) throw new Error("Invalid token");
 
   //Fetch hashed token from REDIS
   const redisKey = `refresh_token:${decoded.sub}`;
   const storedHash = await redisClient.get(redisKey);
-  // If not in Redis, user is logged out or session expired
   if (!storedHash) throw new Error("Access denied");
 
   const isMatch = crypto.compareToken(incomingToken, storedHash);
@@ -54,7 +52,7 @@ export const refreshUserToken = async (incomingToken) => {
     await redisClient.del(redisKey);
     throw new Error("Reuse detected");
   }
-  const user = await User.findById(decoded.sub);
+  const user = await User.findById(decoded.sub);;
   if (!user) throw new Error("User not found");
   return generateTokensAndSave(user);
 };
@@ -80,7 +78,6 @@ export const requestPasswordReset = async (email) => {
   return true;
 };
 
-
 /**
  * Confirm Password Reset
  */
@@ -88,7 +85,7 @@ export const resetUserPassword = async (token, newPassword) => {
   const user = await User.findOne({
     resetPasswordToken: token,
     resetPasswordExpires: { $gt: Date.now() },
-  });
+  }).select("+resetPasswordToken +resetPasswordExpires");
 
   if (!user) throw new Error("Invalid or expired token");
 
