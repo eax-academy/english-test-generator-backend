@@ -14,7 +14,7 @@ const PARTS_OF_SPEECH = [
   "other",
 ];
 
-const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2", "Unknown", "UNKNOWN"];
+const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2","UNKNOWN"];
 
 const WordSchema = new mongoose.Schema(
   {
@@ -59,12 +59,10 @@ const WordSchema = new mongoose.Schema(
 
     level: {
       type: String,
-      enum: {
-        values: CEFR_LEVELS,
-        message: "{VALUE} is not a valid CEFR level",
-      },
-      default: "Unknown",
+      enum: CEFR_LEVELS,
+      default: "UNKNOWN",
       uppercase: true,
+      index: true
     },
     usage_count: {
       type: Number,
