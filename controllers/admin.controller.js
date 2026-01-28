@@ -24,7 +24,7 @@ export const getDashboardStats = async (req, res) => {
 export const getAllResults = async (req, res) => {
     try {
         const results = await Result.find()
-            .populate('userId', 'name email')
+            .populate('userId', 'email name')
             .populate('quizId', 'title')
             .sort({ completedAt: -1 });
         res.json(results);
@@ -41,3 +41,29 @@ export const getAllTests = async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 };
+
+export const saveResult = async (req, res) => {
+    try {
+        const { quizId, score, elapsedTime, totalQuestions, userId, email } = req.body;
+
+        if (!quizId || score === undefined || !userId) {
+            return res.status(400).json({ message: "Missing required fields" });
+        }
+
+        const result = await Result.create({
+            quizId,
+            score,
+            elapsedTime,
+            totalQuestions,
+            userId,
+            email,
+            completedAt: new Date(),
+        });
+
+        res.status(201).json(result);
+    } catch (err) {
+        console.error("Create result error:", err);
+        res.status(500).json({ message: "Failed to save result" });
+    }
+};
+

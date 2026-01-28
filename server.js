@@ -41,10 +41,9 @@ app.use(
 app.use(globalLimiter);
 app.use(morgan("dev"));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(loggerMiddleware);
-
-// -------------------- Routes --------------------
 
 // Root Route
 app.get("/", (req, res) =>
@@ -69,7 +68,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Internal Server Error" });
 });
 
-// -------------------- Start Server --------------------
+// Start server
 const startServer = async () => {
   try {
     await connectDB();
@@ -83,8 +82,8 @@ const startServer = async () => {
     // 3. (Optional) Set an interval to run the check every 1 hour
     setInterval(() => {
       scheduleDatabaseCheck();
-    }, 1000 * 60 * 60); 
-    
+    }, 1000 * 60 * 60);
+
     server = app.listen(PORT, () => {
       console.log(`🚀 Server is running on port: ${PORT}`);
     });
@@ -96,8 +95,7 @@ const startServer = async () => {
 
 startServer();
 
-// -------------------- Shutdown --------------------
-
+// Shut down server
 const handleTermination = async (signal) => {
   console.log(`\n${signal} received. Initiating termination sequence...`);
 

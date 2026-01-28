@@ -9,6 +9,7 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "an-array-of-english-words": "^2.0.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",

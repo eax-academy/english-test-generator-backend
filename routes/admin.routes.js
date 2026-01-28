@@ -11,6 +11,7 @@ import {
   getDashboardStats,
   getAllTests,
   getAllResults,
+  saveResult,
 } from "../controllers/admin.controller.js";
 
 const router = express.Router();
@@ -28,6 +29,7 @@ router.get("/dashboard", getDashboardStats);
 
 // Results (Tests & Attempts)
 router.get("/results", getAllResults);
+router.post("/results", saveResult)
 router.get("/tests", getAllTests);
 
 export default router;
