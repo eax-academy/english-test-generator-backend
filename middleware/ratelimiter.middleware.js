@@ -22,7 +22,7 @@ export const globalLimiter = rateLimit({
 // 2. AUTH LIMITER
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 5, // 5
+  limit: 100, // 5
   standardHeaders: true,
   legacyHeaders: false,
   statusCode: 429,
@@ -36,7 +36,7 @@ export const authLimiter = rateLimit({
 // 3. REGISTRATION LIMITER (24 hours)
 export const registrationLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
-  limit: 10,
+  limit: 100,
   standardHeaders: true,
   legacyHeaders: false,
   statusCode: 429,

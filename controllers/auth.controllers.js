@@ -76,7 +76,7 @@ export const login = async (req, res) => {
     const { email, password } = LoginSchema.parse(req.body);
     const { accessToken, refreshToken, user } = await authService.loginUser({ email, password });
     setTokenCookies(res, accessToken, refreshToken);
-    res.json({ message: 'Login successful', user });
+    res.json({ message: 'Login successful', user, token: accessToken });
   } catch (error) {
     handleError(res, error);
   }
@@ -92,7 +92,7 @@ export const adminLogin = async (req, res) => {
     }
 
     setTokenCookies(res, accessToken, refreshToken);
-    res.json({ message: 'Admin Login successful', user });
+    res.json({ message: 'Admin Login successful', user, token: accessToken });
   } catch (error) {
     handleError(res, error);
   }

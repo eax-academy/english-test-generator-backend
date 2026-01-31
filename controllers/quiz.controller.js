@@ -8,7 +8,10 @@ import TextSubmission from "../models/textSubmission.model.js";
 export async function createQuizController(req, res) {
   try {
     const { title, text, type, difficulty } = req.body;
-    const userId = req.user?.id || "654321654321654321654321";  // TODO: return null
+    const userId = req.user?.sub;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
     const result = await createQuizService({ title, text, type, difficulty, userId });
     res.status(201).json(result);
@@ -25,7 +28,8 @@ export async function getAllQuizzes(req, res) {
       .populate({
         path: "textSubmissionId",
         select: "raw_text"
-      });
+      })
+      .populate("createdBy", "name email");
 
     const result = quizzes.map(q => ({
       ...q.toObject(),
@@ -42,7 +46,7 @@ export async function getQuizById(req, res) {
   try {
     const quiz = await Quiz.findById(req.params.id).populate({
       path: "textSubmissionId",
-      select: "raw_text" 
+      select: "raw_text"
     });
 
     if (!quiz) return res.status(404).json({ message: "Quiz not found" });
