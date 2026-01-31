@@ -69,9 +69,6 @@ export async function fetchDefinitionAndPos(word) {
   }
 }
 
-// ===============================
-// POS Guess
-// ===============================
 export function guessPos(word) {
   if (!word) return "noun";
   const w = word.toLowerCase();
@@ -83,9 +80,6 @@ export function guessPos(word) {
   return "noun";
 }
 
-// ===============================
-// Definition Scoring
-// ===============================
 const COMMON_POS_BOOST = {
   noun: 2,
   verb: 2,
