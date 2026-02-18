@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import { config } from "../config/env.js";
 
 export const verifyToken = (req, res, next) => {
-  const token = req.cookies.accessToken || req.headers.authorization?.split(" ")[1];
+  const token = req.cookies.accessToken;
   if (!token) {
     return res.status(401).json({ error: "Authentication required" });
   }

@@ -1,6 +1,7 @@
 import * as authService from '../services/auth.service.js';
 import { z } from 'zod';
 import { config } from '../config/env.js'; // Assuming you have your env config here
+import jwt from 'jsonwebtoken';
 
 // --- CONFIGURATION ---
 // Cookie settings for security
@@ -75,12 +76,22 @@ export const login = async (req, res) => {
   try {
     const { email, password } = LoginSchema.parse(req.body);
     const { accessToken, refreshToken, user } = await authService.loginUser({ email, password });
+
+    if (!user || !accessToken || !refreshToken) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
     setTokenCookies(res, accessToken, refreshToken);
-    res.json({ message: 'Login successful', user, token: accessToken });
+
+    res.json({ message: "Login successful", user, token: accessToken });
   } catch (error) {
-    handleError(res, error);
+    console.error("Login error:", error);
+    const status = error?.statusCode || 500;
+    const message = error?.message || "Internal Server Error";
+    res.status(status).json({ message });
   }
 };
+
 
 export const adminLogin = async (req, res) => {
   try {
@@ -98,34 +109,52 @@ export const adminLogin = async (req, res) => {
   }
 };
 
+
 export const refresh = async (req, res) => {
   try {
     const token = req.cookies.refreshToken;
-    const { accessToken, refreshToken } = await authService.refreshUserToken(token);
+
+    if (!token) {
+      return res.status(401).json({ error: "No refresh token" });
+    }
+
+    const { accessToken, refreshToken, user } =
+      await authService.refreshUserToken(token);
+
     setTokenCookies(res, accessToken, refreshToken);
-    res.json({ message: 'Tokens refreshed' });
+
+    return res.json({ user }); 
   } catch (error) {
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
-    res.status(403).json({ error: 'Session expired, please login again' });
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    return res.status(403).json({ error: "Session expired" });
   }
 };
 
+
 export const logout = async (req, res) => {
   try {
-    const userId = req.user?.sub; // "sub" comes from the middleware
+    let userId = req.user?.sub;
+
+    // Try to get userId from refresh token if req.user is missing
     if (!userId && req.cookies.refreshToken) {
       const decoded = jwt.decode(req.cookies.refreshToken);
-      userId = decoded?.sub;
+      if (decoded?.sub) userId = decoded.sub;
     }
+
+    // Call logout service only if we have a userId
     if (userId) {
       await authService.logoutUser(userId);
     }
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
-    res.json({ message: 'Logged out successfully' });
+
+    // Clear cookies
+    res.clearCookie("accessToken", { ...COOKIE_OPTIONS, path: "/" });
+    res.clearCookie("refreshToken", { ...COOKIE_OPTIONS, path: "/" });
+
+    res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
-    handleError(res, error);
+    console.error("Logout error:", error);
+    res.status(500).json({ message: "Failed to logout" });
   }
 };
 

@@ -9,11 +9,10 @@ const router = express.Router();
 router.post("/register", registrationLimiter, authContoller.register);
 router.post("/login", authLimiter, authContoller.login); // Restored Limiter for users
 router.post("/admin/login", authContoller.adminLogin); // No Limiter for admins
-router.post("/refresh", authContoller.refresh);
+router.get("/refresh", authContoller.refresh);
 router.post("/forgot-password", authContoller.forgotPassword);
 router.post("/reset-password", authContoller.resetPassword);
-
-router.post("/logout", verifyToken, authContoller.logout);
+router.post("/logout", authContoller.logout);
 router.get("/me", verifyToken, (req, res) => {
   res.json({
     id: req.user.sub,
