@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-const ALLOWED_ROLES = ["user", "admin"]; 
+const ALLOWED_ROLES = ["user", "admin"];
 
 const userSchema = new mongoose.Schema(
   {
@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
     password: {
-      type: String, 
+      type: String,
       required: true,
       select: false
     },
@@ -49,7 +49,7 @@ const userSchema = new mongoose.Schema(
     // --- AUTH SYSTEM REQUIREMENT ---
     resetPasswordToken: {
       type: String,
-      default: undefined, 
+      default: undefined,
       select: false
     },
     resetPasswordExpires: {
@@ -57,15 +57,20 @@ const userSchema = new mongoose.Schema(
       default: undefined,
       select: false
     },
+    passwordResetCooldown: {
+      type: Date,
+      default: undefined,
+      select: false
+    },
   },
 
-  { 
+  {
     timestamps: true,
     toJSON: {
       transform: (doc, ret) => {
-        delete ret.__v; 
+        delete ret.__v;
         return ret;
-      } 
+      }
     }
   }
 );

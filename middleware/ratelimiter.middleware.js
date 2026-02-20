@@ -58,3 +58,17 @@ export const apiLimiter = rateLimit({
   },
   store: createRedisStore("api"),
 });
+
+// 5. FORGOT PASSWORD LIMITER (strict: 5 per hour)
+export const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  statusCode: 429,
+  message: {
+    error: "Too many password reset attempts. Please try again in 1 hour.",
+  },
+  store: createRedisStore("forgot-password"),
+});
+

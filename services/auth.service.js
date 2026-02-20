@@ -56,16 +56,32 @@ export const refreshUserToken = async (incomingToken) => {
 };
 
 /**
- * Reset password directly — no email token needed
+ * Change password — user must be logged in and know their current password.
+ * Only the real owner can change the password this way.
  */
-export const resetPasswordDirect = async (email, newPassword) => {
-  const user = await User.findOne({ email }).select("+password");
+export const changePassword = async (userId, currentPassword, newPassword) => {
+  const user = await User.findById(userId)
+    .select("+password +passwordResetCooldown");
   if (!user) throw new Error("User not found");
 
+  // Verify current password — blocks anyone who doesn't know it
+  const isMatch = await crypto.comparePassword(currentPassword, user.password);
+  if (!isMatch) throw new Error("Current password is incorrect");
+
+  // Cooldown: prevent rapid repeated changes
+  if (user.passwordResetCooldown && user.passwordResetCooldown > Date.now()) {
+    const waitMs = user.passwordResetCooldown - Date.now();
+    const waitMin = Math.ceil(waitMs / 60000);
+    throw new Error(`Please wait ${waitMin} minute(s) before changing again.`);
+  }
+
   user.password = await crypto.hashPassword(newPassword);
+  user.passwordResetCooldown = new Date(Date.now() + 10 * 60 * 1000);
   await user.save();
   return true;
 };
+
+
 
 export const logoutUser = async (userId) => {
   await redisClient.del(`refresh_token:${userId}`);
