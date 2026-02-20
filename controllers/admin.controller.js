@@ -46,7 +46,7 @@ export const saveResult = async (req, res) => {
     try {
         const { quizId, score, elapsedTime, totalQuestions, userId, email } = req.body;
 
-        if (!quizId || score === undefined || !userId) {
+        if (!quizId || score === undefined || !userId || !email) {
             return res.status(400).json({ message: "Missing required fields" });
         }
 

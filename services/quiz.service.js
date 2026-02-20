@@ -5,6 +5,8 @@ import Word from "../models/word.model.js";
 import { handleTextSubmission } from "./analyze.service.js";
 import { translateToArmenian } from "../api/translateToArmenian.js";
 import { fetchDefinitionAndPos } from "../api/fetchDefinition.js";
+import { addWordsWithTranslationsAndDefinitions } from "../utils/quiz.js";
+
 
 // -------------------- Utilities --------------------
 const escapeRegExp = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -116,43 +118,21 @@ export async function createQuizService({ title, text, type = "mixed", difficult
   const sigWords = submission?.data?.significantWords;
   if (!sigWords || sigWords.length < 5) throw new Error("Not enough keywords found");
 
-  // FIX 1: Normalize all keywords to lowercase and trim to prevent "Province" vs "province" issues
+  // Normalize all keywords to lowercase and trim
   const keywords = [...new Set(sigWords.map((w) => w.word.toLowerCase().trim()))];
 
+  // Add all new words to DB with translations and definitions
+  await addWordsWithTranslationsAndDefinitions(keywords);
+
+  // Fetch all words from DB (now all should exist)
+  const allWords = await Word.find({ word: { $in: keywords } });
+  const wordMap = new Map(allWords.map((w) => [w.word.toLowerCase(), w]));
+
+  // Build cache for question generation
   const cache = await buildWordCache(keywords);
   const validKeywords = keywords.filter((k) => cache.has(k));
 
-  // FIX 2: Find existing words using normalized keys
-  const existingWords = await Word.find({ word: { $in: validKeywords } });
-  const wordMap = new Map(existingWords.map((w) => [w.word.toLowerCase(), w]));
-
-  const wordsToCreate = validKeywords
-    .filter((k) => !wordMap.has(k))
-    .map((k) => ({
-      word: k,
-      lemma: k,
-      level: cache.get(k).level,
-      partOfSpeech: cache.get(k).pos,
-      translation: cache.get(k).translation,
-      definition: cache.get(k).definition,
-    }));
-
-  if (wordsToCreate.length > 0) {
-    try {
-      // FIX 3: Use ordered: false so if one word fails (duplicate), others still succeed
-      const createdWords = await Word.insertMany(wordsToCreate, { ordered: false });
-      createdWords.forEach((w) => wordMap.set(w.word.toLowerCase(), w));
-    } catch (err) {
-      // If error is code 11000 (duplicate), we can ignore it and fetch the ones that were just created by the other process
-      if (err.code !== 11000) throw err;
-      const refetched = await Word.find({ word: { $in: wordsToCreate.map(w => w.word) } });
-      refetched.forEach((w) => wordMap.set(w.word.toLowerCase(), w));
-    }
-  }
-
   const questionBlueprints = await generateQuestions(validKeywords, text, type, 10, cache);
-
-  // FIX 4: Ensure every question blueprint actually found a word in the wordMap
   const validBlueprints = questionBlueprints.filter(q => wordMap.has(q.wordKey));
 
   const questionDocs = await Question.insertMany(

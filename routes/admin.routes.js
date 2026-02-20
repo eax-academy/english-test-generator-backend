@@ -16,20 +16,20 @@ import {
 
 const router = express.Router();
 
-//router.use(verifyToken, isAdmin);
+router.use(verifyToken);
 
-router.use("/logs", adminLog);
-router.use("/words", adminWords);
-router.use("/submissions", adminSubmissions);
-router.use("/quizzes", adminQuizzes);
-router.use("/users", adminUsers);
+router.use("/logs", isAdmin, adminLog);
+router.use("/words", isAdmin, adminWords);
+router.use("/submissions", isAdmin, adminSubmissions);
+router.use("/quizzes", isAdmin, adminQuizzes);
+router.use("/users", isAdmin, adminUsers);
 
 // Dashboard
-router.get("/dashboard", getDashboardStats);
+router.get("/dashboard", isAdmin, getDashboardStats);
 
 // Results (Tests & Attempts)
-router.get("/results", getAllResults);
+router.get("/results", isAdmin, getAllResults);
 router.post("/results", saveResult)
-router.get("/tests", getAllTests);
+router.get("/tests", isAdmin, getAllTests);
 
 export default router;
