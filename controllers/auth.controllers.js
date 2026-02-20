@@ -25,13 +25,16 @@ const LoginSchema = z.object({
   password: z.string(),
 });
 
-const ForgotPassSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+const ChangePassSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(6, "New password must be at least 6 characters"),
   confirmPassword: z.string().min(6),
-}).refine((data) => data.password === data.confirmPassword, {
+}).refine((data) => data.newPassword === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
+}).refine((data) => data.currentPassword !== data.newPassword, {
+  message: "New password must be different from current password",
+  path: ["newPassword"],
 });
 
 // --- HELPERS ---
@@ -55,7 +58,10 @@ const handleError = (res, error) => {
   }
   if (error.message === 'User already exists') return res.status(409).json({ error: error.message });
   if (error.message === 'Invalid credentials') return res.status(401).json({ error: error.message });
+  if (error.message === 'Current password is incorrect') return res.status(401).json({ error: error.message });
+  if (error.message === 'User not found') return res.status(404).json({ error: error.message });
   if (error.message === 'Access denied' || error.message === 'Reuse detected') return res.status(403).json({ error: 'Forbidden' });
+  if (error.message?.startsWith('Please wait')) return res.status(429).json({ error: error.message });
 
   console.error(error);
   res.status(500).json({ error: 'Internal Server Error' });
@@ -77,21 +83,15 @@ export const login = async (req, res) => {
   try {
     const { email, password } = LoginSchema.parse(req.body);
     const { accessToken, refreshToken, user } = await authService.loginUser({ email, password });
-
-    if (!user || !accessToken || !refreshToken) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
     setTokenCookies(res, accessToken, refreshToken);
-
-    res.json({ message: "Login successful", user, token: accessToken });
+    // Strip sensitive fields before sending to client
+    const { password: _pw, ...safeUser } = user.toObject ? user.toObject() : user;
+    res.json({ message: 'Login successful', user: safeUser, token: accessToken });
   } catch (error) {
-    console.error("Login error:", error);
-    const status = error?.statusCode || 500;
-    const message = error?.message || "Internal Server Error";
-    res.status(status).json({ message });
+    handleError(res, error);
   }
 };
+
 
 
 export const adminLogin = async (req, res) => {
@@ -124,7 +124,7 @@ export const refresh = async (req, res) => {
 
     setTokenCookies(res, accessToken, refreshToken);
 
-    return res.json({ user }); 
+    return res.json({ user });
   } catch (error) {
     res.clearCookie("accessToken");
     res.clearCookie("refreshToken");
@@ -159,11 +159,15 @@ export const logout = async (req, res) => {
   }
 };
 
-export const forgotPassword = async (req, res) => {
+// Requires verifyToken middleware — only the logged-in user can change THEIR OWN password
+export const changePassword = async (req, res) => {
   try {
-    const { email, password } = ForgotPassSchema.parse(req.body);
-    await authService.resetPasswordDirect(email, password);
-    res.json({ message: 'Password reset successfully. Please login.' });
+    const userId = req.user?.sub;
+    if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+
+    const { currentPassword, newPassword } = ChangePassSchema.parse(req.body);
+    await authService.changePassword(userId, currentPassword, newPassword);
+    res.json({ message: 'Password changed successfully.' });
   } catch (error) {
     handleError(res, error);
   }
