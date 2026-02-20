@@ -11,8 +11,7 @@ router.post("/login", authLimiter, authContoller.login); // Restored Limiter for
 router.post("/admin/login", authContoller.adminLogin); // No Limiter for admins
 router.get("/refresh", authContoller.refresh);
 router.post("/forgot-password", authContoller.forgotPassword);
-router.post("/reset-password", authContoller.resetPassword);
-router.post("/logout", authContoller.logout);
+router.post("/logout", verifyToken, authContoller.logout);
 router.get("/me", verifyToken, (req, res) => {
   res.json({
     id: req.user.sub,

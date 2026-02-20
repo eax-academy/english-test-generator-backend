@@ -72,16 +72,6 @@ const startServer = async () => {
   try {
     await connectDB();
     await connectRedis();
-    // 1. Start the worker (it will wait for jobs to appear in Redis)
-    startWordWorker();
-
-    // 2. Start the scheduler immediately to find words needing updates
-    scheduleDatabaseCheck();
-
-    // 3. (Optional) Set an interval to run the check every 1 hour
-    setInterval(() => {
-      scheduleDatabaseCheck();
-    }, 1000 * 60 * 60);
 
     server = app.listen(PORT, () => {
       console.log(`🚀 Server is running on port: ${PORT}`);
