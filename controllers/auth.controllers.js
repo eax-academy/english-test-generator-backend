@@ -24,12 +24,13 @@ const LoginSchema = z.object({
   password: z.string(),
 });
 
-const ResetPassSchema = z.object({
-  password: z.string().min(6),
-});
-
 const ForgotPassSchema = z.object({
   email: z.string().email(),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string().min(6),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 // --- HELPERS ---
@@ -131,20 +132,9 @@ export const logout = async (req, res) => {
 
 export const forgotPassword = async (req, res) => {
   try {
-    const { email } = ForgotPassSchema.parse(req.body);
-    await authService.requestPasswordReset(email);
-    res.json({ message: 'If that email exists, a reset link has been sent.' });
-  } catch (error) {
-    handleError(res, error);
-  }
-};
-
-export const resetPassword = async (req, res) => {
-  try {
-    const { token } = req.params;
-    const { password } = ResetPassSchema.parse(req.body);
-    await authService.resetUserPassword(token, password);
-    res.json({ message: 'Password reset successful. Please login.' });
+    const { email, password } = ForgotPassSchema.parse(req.body);
+    await authService.resetPasswordDirect(email, password);
+    res.json({ message: 'Password reset successfully. Please login.' });
   } catch (error) {
     handleError(res, error);
   }
