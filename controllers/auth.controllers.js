@@ -8,7 +8,7 @@ import jwt from 'jsonwebtoken';
 const COOKIE_OPTIONS = {
   httpOnly: true, // Prevent XSS (JS cannot read these)
   secure: config.env === 'production', // HTTPS only in production
-  sameSite: 'strict', // CSRF protection
+  sameSite: 'lax', // CSRF protection
   path: '/', // Available everywhere
 };
 

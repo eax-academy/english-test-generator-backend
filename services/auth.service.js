@@ -20,7 +20,7 @@ export async function registerUser({ name, surname, email, password }) {
  * Login user and issue Access + Refresh Tokens
  */
 export async function loginUser({ email, password }) {
-  const user = await User.findOne({ email }).select("+password");;
+  const user = await User.findOne({ email }).select("+password");
   if (!user) throw new Error("User not found");
 
   const valid = await crypto.comparePassword(password, user.password);

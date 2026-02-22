@@ -30,12 +30,27 @@ const PORT = config.port || 5000;
 let server;
 
 // Middleware
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+];
+
 app.use(
   cors({
-    origin: "http://localhost:5173", // Your Frontend URL
-    credentials: true, // Allow cookies to be sent
+    origin: (origin, callback) => {
+      // Allow requests with no origin (curl, mobile apps, etc.)
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
+    credentials: true,
   })
 );
+
 
 app.use(globalLimiter);
 app.use(morgan("dev"));
