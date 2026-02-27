@@ -113,6 +113,7 @@ export async function generateQuestions(keywords, text, type, total, cache) {
 // -------------------- Main Service --------------------
 export async function createQuizService({ title, text, type = "mixed", difficulty = "basic", userId }) {
   if (!title || !text) throw new Error("Title and text required");
+  if (text.length > 10000) throw new Error("Text exceeds maximum length of 1000 words");
 
   const submission = await handleTextSubmission(text, userId);
   const sigWords = submission?.data?.significantWords;
