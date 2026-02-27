@@ -12,8 +12,6 @@ import {
   apiLimiter,
 } from "./middleware/ratelimiter.middleware.js";
 
-import { startWordWorker, stopWordWorker } from "./queues/startWorker.js";
-import { scheduleDatabaseCheck, closeQueue } from "./queues/scheduler.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import quizRoutes from "./routes/quiz.routes.js";
