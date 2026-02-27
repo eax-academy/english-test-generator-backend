@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const MAX_TEXT_LENGTH = 2000; // Adjusted for ~300 words (approx 6 chars per word + buffer)
+const MAX_TEXT_LENGTH = 10000; // Adjusted for 1000+ words (assuming avg 5 chars/word + spaces)
 const MAX_KEYWORD_COUNT = 20;
 
 
