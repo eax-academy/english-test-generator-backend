@@ -67,3 +67,39 @@ export const saveResult = async (req, res) => {
     }
 };
 
+
+export const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userToDelete = await User.findById(id);
+
+    if (!userToDelete) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const systemAdmins = process.env.ADMIN_EMAILS.split(",").map((e) =>
+      e.trim(),
+    );
+
+    if (systemAdmins.includes(userToDelete.email)) {
+      return res.status(403).json({
+        message: "This is a System Admin and cannot be deleted.",
+      });
+    }
+
+    await User.findByIdAndDelete(id);
+    res.json({ message: "User deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select("-password").sort({ createdAt: -1 });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+

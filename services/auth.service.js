@@ -20,11 +20,15 @@ export async function registerUser({ name, surname, email, password }) {
  * Login user and issue Access + Refresh Tokens
  */
 export async function loginUser({ email, password }) {
+  const normalizedEmail = email.toLowerCase();
   const user = await User.findOne({ email }).select("+password");;
   if (!user) throw new Error("User not found");
 
   const valid = await crypto.comparePassword(password, user.password);
-  if (!valid) throw new Error("Invalid credentials");
+  if (!valid) {
+  console.log(`❌ Login attempt failed for ${normalizedEmail}`)
+  throw new Error("Invalid credentials");
+  }
 
   return generateTokensAndSave(user);
 }
@@ -81,14 +85,11 @@ export const changePassword = async (userId, currentPassword, newPassword) => {
   return true;
 };
 
-
-
 export const logoutUser = async (userId) => {
   await redisClient.del(`refresh_token:${userId}`);
 };
 
 
-// INTERNAL HELPER 
 const generateTokensAndSave = async (user) => {
   const payload = { sub: user._id, role: user.role };
 
