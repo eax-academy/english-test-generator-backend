@@ -16,7 +16,8 @@ export const config = {
   env: process.env.NODE_ENV || "development",
   geminiApiKey: process.env.GEMINI_API_KEY,
   saltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS, 10) || 12,
-
+  emailUser: process.env.EMAIL_USER,
+  emailPass: process.env.EMAIL_PASS,
   cookieOptions: {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

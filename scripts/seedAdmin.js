@@ -1,25 +1,26 @@
 import mongoose from "mongoose";
-import * as crypto from "../utils/crypto.js"; // Using your hashing utility
-import { config } from "../config/env.js";
+import bcrypt from "bcrypt";
 import User from "../models/user.model.js";
 
-const seedAdmins = async () => {
+export const seedAdmins = async () => {
   try {
-    await mongoose.connect(config.mongoUri);
-    console.log("📡 Admin seeding started...");
+    const adminEmailsStr = process.env.ADMIN_EMAILS;
+    const initialPassword = process.env.INITIAL_ADMIN_PASSWORD;
 
-    const emails = process.env.ADMIN_EMAILS.split(",").map((e) =>
-      e.trim().toLowerCase(),
-    );
+    if (!adminEmailsStr || !initialPassword) {
+      console.log(
+        "⚠️ Seeding skipped: ADMIN_EMAILS or PASSWORD not set in .env",
+      );
+      return;
+    }
 
-    const password = process.env.INITIAL_ADMIN_PASSWORD;
+    const emails = adminEmailsStr.split(",").map((e) => e.trim().toLowerCase());
 
     for (const email of emails) {
       const exists = await User.findOne({ email });
 
       if (!exists) {
-        const hashedPassword = await crypto.hashPassword(password);
-
+        const hashedPassword = await bcrypt.hash(initialPassword, 12);
         await User.create({
           name: "System",
           surname: "Admin",
@@ -27,25 +28,10 @@ const seedAdmins = async () => {
           password: hashedPassword,
           role: "admin",
         });
-
-        console.log(`✅ Admin created: ${email}`);
-      } else {
-        if (exists.role !== "admin") {
-          exists.role = "admin";
-          await exists.save();
-          console.log(`🆙 Role updated to admin: ${email}`);
-        } else {
-          console.log(`ℹ️ Admin already exists: ${email}`);
-        }
+        console.log(`✅ Admin created automatically: ${email}`);
       }
     }
-
-    await mongoose.disconnect();
-    console.log("🏁 Seeding completed successfully.");
-  } catch (err) {
-    console.error("❌ Seeding error:", err.message);
-    process.exit(1);
+  } catch (error) {
+    console.error("❌ Automatic Seeding Error:", error.message);
   }
 };
-
-seedAdmins();
