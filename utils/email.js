@@ -1,18 +1,21 @@
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
+import { config } from "../config/env.js"; 
 
-export const sendEmail = async (to, subject, html) => {
-    const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-        }
-    });
+export const sendEmail = async (options) => {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: config.emailUser,
+      pass: config.emailPass,
+    },
+  });
 
-    await transporter.sendMail({
-        from: `English Test Generator <${process.env.EMAIL_USER}>`,
-        to,
-        subject,
-        html
-    });
+  const mailOptions = {
+    from: `"English Test Generator" <${config.emailUser}>`,
+    to: options.email, 
+    subject: options.subject, 
+    html: options.html, 
+  };
+
+  await transporter.sendMail(mailOptions);
 };
