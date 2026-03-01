@@ -20,15 +20,13 @@ export async function registerUser({ name, surname, email, password }) {
  * Login user and issue Access + Refresh Tokens
  */
 export async function loginUser({ email, password }) {
-  const normalizedEmail = email.toLowerCase();
-  const user = await User.findOne({ email }).select("+password");;
+  const user = await User.findOne({ email: email.toLowerCase() }).select(
+    "+password",
+  );
   if (!user) throw new Error("User not found");
 
   const valid = await crypto.comparePassword(password, user.password);
-  if (!valid) {
-  console.log(`❌ Login attempt failed for ${normalizedEmail}`)
-  throw new Error("Invalid credentials");
-  }
+  if (!valid) throw new Error("Invalid credentials");
 
   return generateTokensAndSave(user);
 }
@@ -54,7 +52,7 @@ export const refreshUserToken = async (incomingToken) => {
     await redisClient.del(redisKey);
     throw new Error("Reuse detected");
   }
-  const user = await User.findById(decoded.sub);;
+  const user = await User.findById(decoded.sub);
   if (!user) throw new Error("User not found");
   return generateTokensAndSave(user);
 };
@@ -64,8 +62,9 @@ export const refreshUserToken = async (incomingToken) => {
  * Only the real owner can change the password this way.
  */
 export const changePassword = async (userId, currentPassword, newPassword) => {
-  const user = await User.findById(userId)
-    .select("+password +passwordResetCooldown");
+  const user = await User.findById(userId).select(
+    "+password +passwordResetCooldown",
+  );
   if (!user) throw new Error("User not found");
 
   // Verify current password — blocks anyone who doesn't know it
@@ -88,7 +87,6 @@ export const changePassword = async (userId, currentPassword, newPassword) => {
 export const logoutUser = async (userId) => {
   await redisClient.del(`refresh_token:${userId}`);
 };
-
 
 const generateTokensAndSave = async (user) => {
   const payload = { sub: user._id, role: user.role };
