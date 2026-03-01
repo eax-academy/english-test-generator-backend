@@ -12,15 +12,16 @@ import {
   apiLimiter,
 } from "./middleware/ratelimiter.middleware.js";
 
-
 import authRoutes from "./routes/auth.routes.js";
 import quizRoutes from "./routes/quiz.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import testsRouter from "./routes/tests.routes.js";
 import usersRouter from "./routes/users.routes.js";
-//TODO: analyze route change isAdmin
 import analyzeRouter from "./routes/analyze.routes.js";
 import loggerMiddleware from "./middleware/logger.middleware.js";
+
+import { startWordWorker } from "./queues/startWorker.js";
+import { scheduleDatabaseCheck } from "./queues/scheduler.js";
 
 import { config } from "./config/env.js";
 const app = express();
@@ -32,7 +33,7 @@ app.use(
   cors({
     origin: "http://localhost:5173", // Your Frontend URL
     credentials: true, // Allow cookies to be sent
-  })
+  }),
 );
 
 app.use(globalLimiter);
@@ -44,7 +45,7 @@ app.use(loggerMiddleware);
 
 // Root Route
 app.get("/", (req, res) =>
-  res.json({ message: "🧠 English Test Generator Backend is running" })
+  res.json({ message: "🧠 English Test Generator Backend is running" }),
 );
 
 // API Routes
@@ -70,6 +71,15 @@ const startServer = async () => {
   try {
     await connectDB();
     await connectRedis();
+    startWordWorker();
+    console.log("Word Update Worker started");
+
+    await scheduleDatabaseCheck();
+
+    setInterval(() => {
+      console.log("⏱️ Running scheduled database check...");
+      scheduleDatabaseCheck();
+    }, 60 * 60 * 1000);
 
     server = app.listen(PORT, () => {
       console.log(`🚀 Server is running on port: ${PORT}`);

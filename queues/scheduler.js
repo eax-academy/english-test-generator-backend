@@ -1,10 +1,16 @@
 import { Queue } from "bullmq";
 import WordModel from "../models/word.model.js";
 import { queueConfig } from "../config/queue.js";
+import { config } from "../config/env.js";
 
 export const wordQueue = new Queue("word-updates", queueConfig);
 
 export const scheduleDatabaseCheck = async () => {
+  if (!config.geminiApiKey) {
+    console.warn("⚠️ Scheduler skipped: GEMINI_API_KEY is not configured.");
+    return;
+  }
+
   try {
     const wordsToUpdate = await WordModel.find({
       $or: [

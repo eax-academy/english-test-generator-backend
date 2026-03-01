@@ -1,13 +1,21 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "../config/env.js";
 
-const genAI = new GoogleGenerativeAI(config.geminiApiKey);
+const genAI = config.geminiApiKey
+  ? new GoogleGenerativeAI(config.geminiApiKey)
+  : null;
 
 export const fetchWordUpdates = async (word) => {
+  if (!genAI) {
+    const error = new Error("MISSING_API_KEY");
+    error.isCritical = true;
+    throw error;
+  }
+
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash", 
-      generationConfig: { response_mime_type: "application/json" }, 
+      model: "gemini-2.0-flash",
+      generationConfig: { response_mime_type: "application/json" },
     });
 
     const prompt = `Analyze the English word "${word}". Return a JSON object:
@@ -31,7 +39,6 @@ export const fetchWordUpdates = async (word) => {
       partOfSpeech: data.partOfSpeech || "other",
     };
   } catch (error) {
-    // Detect 429 (Too Many Requests)
     if (
       error.status === 429 ||
       error.message?.includes("429") ||
@@ -41,6 +48,16 @@ export const fetchWordUpdates = async (word) => {
       rateLimitError.status = 429;
       throw rateLimitError;
     }
+
+    if (
+      error.message?.includes("API_KEY_INVALID") ||
+      error.message?.includes("key not found")
+    ) {
+      const authError = new Error("MISSING_API_KEY");
+      authError.isCritical = true;
+      throw authError;
+    }
+
     console.error(`⚠️ Gemini Error for "${word}":`, error.message);
     return null;
   }
