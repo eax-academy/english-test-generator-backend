@@ -22,6 +22,7 @@ import loggerMiddleware from "./middleware/logger.middleware.js";
 
 import { startWordWorker } from "./queues/startWorker.js";
 import { scheduleDatabaseCheck } from "./queues/scheduler.js";
+import { seedAdmins } from "./scripts/seedAdmin.js";
 
 import { config } from "./config/env.js";
 const app = express();
@@ -54,7 +55,6 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/tests", apiLimiter, testsRouter);
 app.use("/api/v1/users", apiLimiter, usersRouter);
-//TODO: ONLY ADMIN analyze route
 app.use("/api/v1/analyze", apiLimiter, analyzeRouter);
 
 // 404 Fallback
@@ -71,6 +71,7 @@ const startServer = async () => {
   try {
     await connectDB();
     await connectRedis();
+    await seedAdmins();
     startWordWorker();
     console.log("Word Update Worker started");
 
