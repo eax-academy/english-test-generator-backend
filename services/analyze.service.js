@@ -22,6 +22,13 @@ const CONFIG = {
   MAX_WORD_LENGTH: 45,
 };
 
+const STOP_WORDS = new Set([
+  "be", "is", "are", "was", "were", "been", "being", 
+  "have", "has", "had", "do", "does", "did", 
+  "not", "no", "so", "very", "just", "too", "ever", "never",
+  "more", "most", "other", "others", "some", "any"
+]);
+
 const TARGET_TAGS = new Set(["Noun", "Verb", "Adjective", "Expression", "Adverb"]);
 const JUNK_TAGS = new Set([
   "Preposition",
@@ -35,6 +42,8 @@ const JUNK_TAGS = new Set([
 const TOP_KEYWORDS_LIMIT = 20;
 
 const englishWords = new Set(words.map((w) => w.toLowerCase()));
+
+
 
 // --- Validation Helpers ---
 
@@ -81,6 +90,8 @@ function getRelevanceMultiplier(globalCount) {
   return 0.3; 
 }
 
+
+
 // ---Helper to add words to the queue
 async function triggerBackgroundUpdate(dbWords) {
   try {
@@ -107,7 +118,7 @@ async function triggerBackgroundUpdate(dbWords) {
     await wordQueue.addBulk(jobs);
     
   } catch (error) {
-    console.error("❌ Error while adding jobs to the queue (triggerBackgroundUpdate):", error.message);
+    console.error("❌ Queue Error:", error.message);
   } 
 } 
 
@@ -135,9 +146,10 @@ export function extractKeywordsWithFrequency(text) {
       if (!root || root.length < CONFIG.MIN_WORD_LENGTH || root.length > CONFIG.MAX_WORD_LENGTH) continue;
       if (!englishWords.has(root)) continue;
 
+      const originalWord = (term.text && term.text.trim()) ? term.text.trim() : root;
       const isTarget = term.tags.some((tag) => TARGET_TAGS.has(tag));
       const isJunk = term.tags.some((tag) => JUNK_TAGS.has(tag));
-      const isSignificant = isTarget && !isJunk;
+      const isSignificant = isTarget && !isJunk && !STOP_WORDS.has(root);;
 
       if (frequencyMap.has(root)) {
         const entry = frequencyMap.get(root);
@@ -145,7 +157,7 @@ export function extractKeywordsWithFrequency(text) {
       } else {
         frequencyMap.set(root, {
           lemma: root,
-          original: term.text,
+          original: originalWord,
           count: 1, 
           isSignificant: isSignificant
         });
@@ -223,7 +235,7 @@ export async function handleTextSubmission(text, userId) {
       const score = (localFreq * difficultyWeight) * relevanceWeight;
 
       return {
-        word: item.original,
+        word: item.original || item.lemma || "word",
         lemma: item.lemma,
         word_id: dbInfo?._id,
         count: item.count,
@@ -267,7 +279,7 @@ export async function handleTextSubmission(text, userId) {
     };
 
   } catch (error) {
-    console.error("Error in handleTextSubmission:", error);
-    return { success: false, error: "Internal processing error." };
+    console.error("CRITICAL ERROR IN handleTextSubmission:", error);
+    return { success: false, error: error.message || "Internal processing error." };
   }
 }

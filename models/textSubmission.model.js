@@ -1,17 +1,19 @@
 import mongoose from "mongoose";
 
-const MAX_TEXT_LENGTH = 10000; // Adjusted for 1000+ words (assuming avg 5 chars/word + spaces)
-const MAX_KEYWORD_COUNT = 20;
+const MAX_TEXT_LENGTH = 50000; 
+const MAX_KEYWORD_COUNT = 30;
 
-
-const NormalizedWordSchema = new mongoose.Schema({
-  word: { type: String, required: true },       // Original text (e.g. "Running")
-  lemma: { type: String, required: true },      // Root form (e.g. "run")
-  word_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Word' }, 
-  count: { type: Number, default: 1 },          // LOCAL usage count (in this text)
-  significanceScore: { type: Number, default: 0 },
-  isSignificant: { type: Boolean, default: false }
-}, { _id: false });
+const NormalizedWordSchema = new mongoose.Schema(
+  {
+    word: { type: String, required: true }, // Original text (e.g. "Running")
+    lemma: { type: String, required: true }, // Root form (e.g. "run")
+    word_id: { type: mongoose.Schema.Types.ObjectId, ref: "Word" },
+    count: { type: Number, default: 1 }, // LOCAL usage count (in this text)
+    significanceScore: { type: Number, default: 0 },
+    isSignificant: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
 
 const textSubmissionSchema = new mongoose.Schema(
   {
@@ -26,18 +28,23 @@ const textSubmissionSchema = new mongoose.Schema(
       required: [true, "Text content is required"],
       trim: true,
       minlength: [10, "Text must be at least 10 characters long"],
-      maxlength: [MAX_TEXT_LENGTH, `Text cannot exceed ${MAX_TEXT_LENGTH} chars`],
+      maxlength: [
+        MAX_TEXT_LENGTH,
+        `Text cannot exceed ${MAX_TEXT_LENGTH} chars`,
+      ],
     },
-    normalized_words: [NormalizedWordSchema], 
-    
+    normalized_words: [NormalizedWordSchema],
 
     top_keywords: {
       type: [String],
       default: [],
-      validate: [val => val.length <= MAX_KEYWORD_COUNT, "{PATH} exceeds the limit of " + MAX_KEYWORD_COUNT],
+      validate: [
+        (val) => val.length <= MAX_KEYWORD_COUNT,
+        "{PATH} exceeds the limit of " + MAX_KEYWORD_COUNT,
+      ],
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const TextSubmission =
