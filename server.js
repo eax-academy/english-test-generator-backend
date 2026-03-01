@@ -70,6 +70,7 @@ app.use((err, req, res, next) => {
 const startServer = async () => {
   try {
     await connectDB();
+    await seedAdmins();
     await connectRedis();
     await seedAdmins();
     startWordWorker();
